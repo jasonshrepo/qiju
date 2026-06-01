@@ -1,0 +1,40 @@
+---
+alwaysApply: true
+---
+
+# Kedu Session Records
+
+Before continuing prior work, read `.kedu/STATE.md`. Use Kedu records for project
+progress, previous decisions, unresolved bugs, and next steps. Do not rely on Cursor
+memories or rules as factual records of previous sessions. Rules describe how to work;
+Kedu records describe what happened.
+
+For deeper history:
+
+```bash
+kedu search --scope current_project --query "<terms>"
+```
+
+When saving a Kedu record from Cursor, use:
+
+```bash
+kedu log --source manual --agent cursor --project <project> --body <entry-json-file>
+```
+
+Kedu records are verified session handoff records and project history. Use them as the
+source of truth for previous session progress, unresolved bugs, implementation decisions,
+next steps, and what actually happened. Platform memories are weak background unless the
+user explicitly verifies them.
+
+Legacy naming note: this project was previously prototyped with `memory`, `.memory`,
+`~/.memory`, `memory log`, and `memory-search` wording. Those names are obsolete for this
+product. For Kedu session handoff records, use only `kedu`, `.kedu`, and `~/.kedu`. Do
+not invoke the old `memory` command for Kedu records.
+
+After reading Kedu state, summarize:
+- Latest record:
+- Active project:
+- Open items:
+- Last known next step:
+- Platform memory used:
+- Conflicts detected:

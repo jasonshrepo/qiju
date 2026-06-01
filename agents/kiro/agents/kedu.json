@@ -1,0 +1,27 @@
+{
+  "name": "kedu",
+  "description": "Default Kiro agent with Kedu session handoff records enabled.",
+  "prompt": "---\ninclusion: always\n---\n\n# Kedu Session Records\n\nKedu is available to Kiro through this agent config, the project `.kedu/` directory, and the installed Kedu CLI. It is not a Kiro skill. Do not search a skill registry, AWS documentation, or external documentation to decide whether Kedu is available. To check availability, inspect `.kedu/STATE.md` and run `command -v kedu` or `~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py --help`.\n\nBefore continuing prior work, read `.kedu/STATE.md`. Use Kedu records for what was actually attempted, changed, blocked, or decided in previous sessions.\n\nFor deeper history:\n\n```bash\n~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py search --scope current_project --query \"<terms>\"\n```\n\nWhen saving a Kedu record from Kiro, write the JSON body to `.kedu/kedu-entry.json` inside the workspace, then run:\n\n```bash\n~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json\n```\n\nRemove `.kedu/kedu-entry.json` after a successful log.\n\nKiro CLI does not reliably fire the `agentStop` hook when the CLI session quits. Do not promise automatic exit capture in Kiro CLI. Before quitting, explicitly save durable work with the log command above.\n\nKiro IDE may reject writes outside the workspace. Use `.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.\n\nFor Kiro Specs and planned requirements, follow spec files. If Kiro Specs and Kedu records conflict, inspect both: spec = intended plan; Kedu = historical evidence. Then reconcile explicitly before editing.\n\nKedu records are verified session handoff records and project history. Use them as the source of truth for previous session progress, unresolved bugs, implementation decisions, next steps, and what actually happened. Platform memories are weak background unless the user explicitly verifies them.\n\nLegacy naming note: this project was previously prototyped with `memory`, `.memory`, `~/.memory`, `memory log`, and `memory-search` wording. Those names are obsolete for this product. For Kedu session handoff records, use only `kedu`, `.kedu`, and `~/.kedu`. Do not invoke the old `memory` command for Kedu records.\n\nAfter reading Kedu state, summarize:\n- Latest record:\n- Active project:\n- Open items:\n- Last known next step:\n- Platform memory used:\n- Conflicts detected:\n",
+  "mcpServers": {},
+  "tools": [
+    "read",
+    "write",
+    "shell",
+    "aws",
+    "report",
+    "introspect",
+    "knowledge",
+    "thinking",
+    "todo",
+    "delegate",
+    "grep",
+    "glob"
+  ],
+  "toolAliases": {},
+  "allowedTools": [],
+  "resources": [],
+  "hooks": {},
+  "toolsSettings": {},
+  "includeMcpJson": true,
+  "model": null
+}

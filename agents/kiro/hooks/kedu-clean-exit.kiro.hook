@@ -1,0 +1,12 @@
+{
+  "name": "Kedu Clean Exit",
+  "version": "1.0.0",
+  "description": "Capture durable Kedu session records after Kiro IDE finishes a turn.",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "If this IDE session contains durable implementation, review, or decision context, summarize it into a structured Kedu record. Write the JSON entry file inside the workspace, for example .kedu/kedu-entry.json, then run:\n\n  ~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py log --source clean_exit --agent kiro --project <project> --body .kedu/kedu-entry.json\n\nInclude title, tags, search_terms, next_steps, and body_md. Do not include secrets. Remember: --body is a path to a JSON file, not inline JSON. Remove the temporary .kedu/kedu-entry.json file after a successful log. Kiro CLI may not fire this hook; CLI sessions must log explicitly before quitting."
+  }
+}

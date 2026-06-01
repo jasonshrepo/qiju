@@ -1,0 +1,19 @@
+[project]
+name = "kedu"
+version = "0.1.0"
+description = "Local-first, lossless session records for AI coding agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb==1.5.3",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+kedu = "scripts.kedu:main"
+
+[tool.setuptools]
+packages = ["scripts"]

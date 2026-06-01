@@ -1,0 +1,37 @@
+[
+  {
+    "type": "aws_access_key",
+    "pattern": "AKIA[0-9A-Z]{16}",
+    "placeholder": "[REDACTED:aws_access_key]"
+  },
+  {
+    "type": "aws_secret_key",
+    "pattern": "(?i)(aws_secret_access_key|secret_access_key|aws_secret_key)\\s*[=:]\\s*[A-Za-z0-9/+=]{40}",
+    "placeholder": "[REDACTED:aws_secret_key]"
+  },
+  {
+    "type": "private_key",
+    "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+    "placeholder": "[REDACTED:private_key]"
+  },
+  {
+    "type": "bearer_token",
+    "pattern": "\\bBearer\\s+[A-Za-z0-9\\-._~+/]{20,}=*",
+    "placeholder": "[REDACTED:bearer_token]"
+  },
+  {
+    "type": "password",
+    "pattern": "(?i)\\bpassword\\s*[=:]\\s*\\S+",
+    "placeholder": "[REDACTED:password]"
+  },
+  {
+    "type": "email",
+    "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+    "placeholder": "[REDACTED:email]"
+  },
+  {
+    "type": "account_id",
+    "pattern": "(?i)\\b(aws\\s+account|account[_ -]?id)\\s*[=:]?\\s*\\d{12}\\b",
+    "placeholder": "[REDACTED:account_id]"
+  }
+]
