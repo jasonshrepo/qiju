@@ -6,7 +6,7 @@ set -euo pipefail
 # Claude Code passes hook metadata on stdin. This script reads that metadata without
 # blocking an agent shell forever, extracts the session id when present, and avoids
 # duplicate clean-exit records. A bare shell hook still cannot summarize the live model
-# context on its own; use the kedu-log skill or a host ask-agent adapter for the actual
+# context on its own; use `/kedu log` or a host ask-agent adapter for the actual
 # structured entry.
 
 KEDU_HOME="${KEDU_HOME:-$HOME/.kedu}"
@@ -75,5 +75,5 @@ if [ -f "$LONG_FILE" ] && grep -q "\"id\"[[:space:]]*:[[:space:]]*\"$SESSION_ID:
   exit 0
 fi
 
-echo "kedu SessionEnd hook: no structured record supplied for session=$SESSION_ID agent=$AGENT; use kedu-log or a host ask-agent adapter" >&2
+echo "kedu SessionEnd hook: no structured record supplied for session=$SESSION_ID agent=$AGENT; use /kedu log or a host ask-agent adapter" >&2
 exit 0

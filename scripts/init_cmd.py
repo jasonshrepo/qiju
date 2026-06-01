@@ -82,7 +82,8 @@ and session handoff, first read `.kedu/STATE.md` and hydrate relevant records th
 kedu search --scope current_project --query "<terms>"
 ```
 
-When saving a Kedu record from Claude Code, use the Kedu log skill or:
+When saving a Kedu record from Claude Code, use `/kedu log`, `/kedu search <query>`,
+or `/kedu <specific instruction>` for durable project memory tasks. Direct CLI form:
 
 ```bash
 kedu log --source manual --agent claude --project <project> --body <entry-json-file>
@@ -174,28 +175,37 @@ kedu log --source manual --agent cursor --project <project> --body <entry-json-f
 {BOOT_SUMMARY}
 """
 
-KEDU_LOG_SKILL = """# kedu-log — Capture Session To Kedu
+KEDU_CLAUDE_SKILL = """# kedu — Unified Kedu Command
 
-Use this skill when the user invokes `/log`, asks to save/checkpoint the current work, or
-asks to create a durable Kedu record.
+Use this skill when the user invokes `/kedu`, asks to save/checkpoint durable context,
+asks to search previous Kedu records, or gives a Kedu-specific instruction such as
+`/kedu remember this decision` or `/kedu find the last deployment note`.
 
-1. Summarize the current session into a structured JSON object with:
+Interpret common forms this way:
+
+- `/kedu log`: save a durable session handoff record.
+- `/kedu search <query>`: search Kedu records, defaulting to the current project.
+- `/kedu <instruction>`: decide whether the instruction is asking to log, search,
+  hydrate/show, initialize, or explain Kedu, then perform that action.
+
+## Log
+
+1. Summarize the current session or requested memory into a structured JSON object with:
    - `title`: one-line summary
    - `agent`: the current host/agent identity, such as `claude`, `codex`, or `kiro`
    - `tags`: 3-5 categories
    - `search_terms`: aliases, service names, error codes, symbols, and useful variants
    - `next_steps`: actionable remaining items
    - `body_md`: full human-readable markdown narrative
-2. Write that JSON object to a temp file.
+2. Write that JSON object to a temporary file inside the workspace when possible, such
+   as `.kedu/kedu-entry.json`.
 3. Run `kedu log --source manual --agent <agent> --project <project> --body <temp-file>`.
-4. Report the returned record id.
+4. Remove the temporary file after a successful log.
+5. Report the returned record id.
 
 Do not include secrets. The CLI runs write-time redaction before persistence.
-"""
 
-KEDU_SEARCH_SKILL = """# kedu-search — Query Kedu Records
-
-Use this skill when prior session context would help answer or continue work.
+## Search
 
 1. Default to `--scope current_project`.
 2. Widen to `--scope all` only when the user asks a cross-project question.
@@ -206,6 +216,12 @@ Use this skill when prior session context would help answer or continue work.
 7. Use `kedu show <id>` when you only need to hydrate one candidate.
 
 Kedu search identifies candidates. The model decides relevance for the current turn.
+
+## Initialize
+
+Use `kedu init --host claude` for project-local setup. Use
+`kedu init --host claude --global` or `kedu init --host claude --place global` only when
+the user wants user-level defaults.
 """
 
 CODEX_KEDU_SKILL = f"""---
@@ -666,11 +682,9 @@ def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
         settings_path = claude_home / "settings.json"
         targets = {
             claude_home / "CLAUDE.md": CLAUDE_BLOCK,
-            claude_home / "skills" / "kedu-log" / "SKILL.md": KEDU_LOG_SKILL,
-            claude_home / "skills" / "kedu-search" / "SKILL.md": KEDU_SEARCH_SKILL,
+            claude_home / "skills" / "kedu" / "SKILL.md": KEDU_CLAUDE_SKILL,
             home / "agents" / "claude-CLAUDE.kedu.md": CLAUDE_BLOCK,
-            home / "agents" / "claude-kedu-log-skill.md": KEDU_LOG_SKILL,
-            home / "agents" / "claude-kedu-search-skill.md": KEDU_SEARCH_SKILL,
+            home / "agents" / "claude-kedu-skill.md": KEDU_CLAUDE_SKILL,
         }
         files.append(str(hook_script))
         _install_claude_session_end_hook(settings_path)
@@ -804,11 +818,9 @@ def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path 
         hook_script = _install_claude_hook_script()
         settings = kedu_paths.project_root / ".claude" / "settings.local.json"
         _install_claude_session_end_hook(settings)
-        log_skill = kedu_paths.project_root / ".claude" / "skills" / "kedu-log" / "SKILL.md"
-        search_skill = kedu_paths.project_root / ".claude" / "skills" / "kedu-search" / "SKILL.md"
-        _write_file(log_skill, KEDU_LOG_SKILL)
-        _write_file(search_skill, KEDU_SEARCH_SKILL)
-        files.extend([str(target), str(settings), str(hook_script), str(log_skill), str(search_skill)])
+        skill = kedu_paths.project_root / ".claude" / "skills" / "kedu" / "SKILL.md"
+        _write_file(skill, KEDU_CLAUDE_SKILL)
+        files.extend([str(target), str(settings), str(hook_script), str(skill)])
     elif agent == "kiro":
         steering = kedu_paths.project_root / ".kiro" / "steering" / "kedu.md"
         hook = kedu_paths.project_root / ".kiro" / "hooks" / "kedu-clean-exit.kiro.hook"

@@ -329,6 +329,7 @@ def cleanup_user_install(
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
         _remove_kedu_block(claude_home / "CLAUDE.md", result, dry_run=dry_run)
         _remove_claude_settings_hook(claude_home / "settings.json", result, dry_run=dry_run)
+        _remove_dir(claude_home / "skills" / "kedu", result, "remove Claude Kedu skill", dry_run=dry_run)
         _remove_dir(claude_home / "skills" / "kedu-log", result, "remove Claude Kedu log skill", dry_run=dry_run)
         _remove_dir(claude_home / "skills" / "kedu-search", result, "remove Claude Kedu search skill", dry_run=dry_run)
         _remove_file_if_contains(claude_home / "hooks" / "session_end_log.sh", "kedu", result, "remove Claude Kedu hook", dry_run=dry_run)
@@ -367,6 +368,7 @@ def cleanup_project_install(
     if "claude" in hosts:
         _remove_kedu_block(project_root / "CLAUDE.md", result, dry_run=dry_run)
         _remove_claude_settings_hook(project_root / ".claude" / "settings.local.json", result, dry_run=dry_run)
+        _remove_dir(project_root / ".claude" / "skills" / "kedu", result, "remove project Claude Kedu skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-log", result, "remove project Claude Kedu log skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-search", result, "remove project Claude Kedu search skill", dry_run=dry_run)
     if "kiro" in hosts:
@@ -439,6 +441,7 @@ def _looks_like_kedu_project(path: Path) -> bool:
             path / ".kedu" / "short.jsonl",
             path / ".kiro" / "agents" / "kedu.json",
             path / ".kiro" / "steering" / "kedu.md",
+            path / ".claude" / "skills" / "kedu" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-log" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-search" / "SKILL.md",
             path / ".cursor" / "rules" / "kedu.mdc",

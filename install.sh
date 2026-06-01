@@ -263,8 +263,7 @@ install_shared_store() {
   install_file "$SOURCE_DIR/hooks/session_end_log.sh" "$KEDU_HOME/hooks/session_end_log.sh" 0755
   install_file "$SOURCE_DIR/adapters/claude_code.sh" "$KEDU_HOME/adapters/claude_code.sh" 0755
   install_file "$SOURCE_DIR/agents/claude/CLAUDE.kedu.md" "$KEDU_HOME/agents/claude-CLAUDE.kedu.md" 0644
-  install_file "$SOURCE_DIR/skills/kedu-log/SKILL.md" "$KEDU_HOME/agents/claude-kedu-log-skill.md" 0644
-  install_file "$SOURCE_DIR/skills/kedu-search/SKILL.md" "$KEDU_HOME/agents/claude-kedu-search-skill.md" 0644
+  install_file "$SOURCE_DIR/skills/kedu/SKILL.md" "$KEDU_HOME/agents/claude-kedu-skill.md" 0644
   install_file "$SOURCE_DIR/agents/codex/AGENTS.kedu.md" "$KEDU_HOME/agents/codex-AGENTS.kedu.md" 0644
   install_file "$SOURCE_DIR/agents/kiro/steering/kedu.md" "$KEDU_HOME/agents/kiro-kedu.md" 0644
   install_file "$SOURCE_DIR/agents/kiro/hooks/kedu-clean-exit.kiro.hook" "$KEDU_HOME/agents/kiro-kedu-clean-exit.kiro.hook" 0644

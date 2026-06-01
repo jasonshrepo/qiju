@@ -8,7 +8,8 @@ and session handoff, first read `.kedu/STATE.md` and hydrate relevant records th
 kedu search --scope current_project --query "<terms>"
 ```
 
-When saving a Kedu record from Claude Code, use the Kedu log skill or:
+When saving a Kedu record from Claude Code, use `/kedu log`, `/kedu search <query>`,
+or `/kedu <specific instruction>` for durable project memory tasks. Direct CLI form:
 
 ```bash
 kedu log --source manual --agent claude --project <project> --body <entry-json-file>

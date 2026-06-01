@@ -64,7 +64,7 @@ kedu init --host claude --place global
 
 Project-local integrations write:
 
-- Claude: appends a line-counted Kedu block to `CLAUDE.md`, registers a `SessionEnd` hook in `.claude/settings.local.json`, and writes project skills under `.claude/skills/`
+- Claude: appends a line-counted Kedu block to `CLAUDE.md`, registers a `SessionEnd` hook in `.claude/settings.local.json`, and writes the unified `/kedu` skill under `.claude/skills/kedu/`
 - Codex: appends a Kedu block to `AGENTS.md`
 - Kiro: writes `.kiro/steering/kedu.md`, `.kiro/hooks/kedu-clean-exit.kiro.hook`, `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
 - Cursor: writes `.cursor/rules/kedu.mdc`
@@ -79,6 +79,14 @@ Claude `CLAUDE.md` sections are wrapped as:
 
 `N` is the number of content lines written by Kedu. Uninstall removes only this marked
 section and leaves the rest of `CLAUDE.md` intact.
+
+In Claude Code, use one command surface:
+
+```text
+/kedu log
+/kedu search <query>
+/kedu <specific instruction about creating or retrieving durable memory>
+```
 
 For Kiro CLI, select the generated agent with:
 
