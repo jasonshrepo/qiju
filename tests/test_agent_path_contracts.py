@@ -81,8 +81,9 @@ def test_contract_codex_skill_has_required_frontmatter(kedu_env):
 # --------------------------------------------------------------------------------------
 # Kiro
 # Contract: steering at .kiro/steering/<name>.md, CLI agent at .kiro/agents/<name>.json,
-# prompt at .kiro/prompts/. User-level under ~/.kiro/. Kiro is wired via steering, not a
-# skill registry.
+# and Agent Skill at .kiro/skills/<name>/SKILL.md. User-level under ~/.kiro/. Kiro is
+# wired via steering (always-on baseline) and an Agent Skill (the `/kedu` slash command,
+# available in both CLI and IDE). The old .kiro/prompts/ saved prompt is retired.
 # --------------------------------------------------------------------------------------
 
 def test_contract_kiro_local(kedu_env):
@@ -90,7 +91,8 @@ def test_contract_kiro_local(kedu_env):
     init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
     assert (project / ".kiro" / "steering" / "kedu.md").exists()
     assert (project / ".kiro" / "agents" / "kedu.json").exists()
-    assert (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    assert (project / ".kiro" / "skills" / "kedu" / "SKILL.md").exists()
+    assert not (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
 
 
 def test_contract_kiro_global(kedu_env, monkeypatch, tmp_path):
@@ -99,7 +101,8 @@ def test_contract_kiro_global(kedu_env, monkeypatch, tmp_path):
     init_cmd.init_kedu(mode="global", agent="kiro", cwd=kedu_env["project"])
     assert (kiro_home / "steering" / "kedu.md").exists()
     assert (kiro_home / "agents" / "kedu.json").exists()
-    assert (kiro_home / "prompts" / "kedu-agent-prompt.md").exists()
+    assert (kiro_home / "skills" / "kedu" / "SKILL.md").exists()
+    assert not (kiro_home / "prompts" / "kedu-agent-prompt.md").exists()
 
 
 # --------------------------------------------------------------------------------------
@@ -150,9 +153,12 @@ def test_contract_kiro_uninstall_removes_steering(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
     steering = project / ".kiro" / "steering" / "kedu.md"
+    skill = project / ".kiro" / "skills" / "kedu" / "SKILL.md"
     assert steering.exists()
+    assert skill.exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("kiro",), dry_run=False)
     assert not steering.exists()
+    assert not skill.exists()
 
 
 def test_contract_cursor_uninstall_removes_rule(kedu_env):

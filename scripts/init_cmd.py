@@ -114,19 +114,22 @@ inclusion: always
 
 # Kedu Session Records
 
-Kedu is available to Kiro through this steering file, the project `.kedu/` directory, and
-the local `kedu` CLI. It is not a Kiro skill. Do not search a skill registry, AWS
-documentation, or external documentation to decide whether Kedu is available. To check
-availability, inspect `.kedu/STATE.md` and run `command -v kedu` or `kedu --help`.
+Kedu is available to Kiro through the `kedu` skill (`.kiro/skills/kedu/SKILL.md`, which you
+can invoke as `/kedu` or which activates automatically when you ask about past sessions),
+this steering file, the project `.kedu/` directory, and the local `kedu` CLI. To check
+availability, inspect `.kedu/STATE.md` and run `command -v kedu` or `kedu --help`. Do not
+search AWS or external documentation to decide whether Kedu is available.
 
-Before continuing prior work, read `.kedu/STATE.md`. Use Kedu records for what was
-actually attempted, changed, blocked, or decided in previous sessions.
-
-For deeper history:
+Before continuing prior work, read `.kedu/STATE.md` for orientation. It is a generated
+summary, not the full record set — do not answer specific questions from it alone. When
+the user asks about any specific topic, decision, bug, tool, error, component, or term,
+convert the question into search terms and run a search before answering:
 
 ```bash
 kedu search --scope current_project --query "<terms>"
 ```
+
+Use `kedu show <id>` to hydrate the full body of a candidate record.
 
 When saving a Kedu record from Kiro, use:
 
@@ -410,6 +413,81 @@ def _kedu_cli_command() -> str:
     return f"{shlex.quote(str(python_bin))} {shlex.quote(str(script))}"
 
 
+def _kiro_skill() -> str:
+    command = _kedu_cli_command()
+    return f"""---
+name: kedu
+description: Use when the user asks about previous sessions, past decisions, unresolved bugs, what was already done, or anything project-history related; when the user invokes `/kedu`; when asked to save, checkpoint, or hand off durable project context; or when asked to search, retrieve, or recall Kedu session records. Also use to initialize Kedu for a project.
+---
+
+# Kedu — Verified Session Handoff Records
+
+Kedu stores verified development-session records as plain files under `.kedu/` and
+`~/.kedu`. Use them as the source of truth for what happened in previous sessions:
+progress, unresolved bugs, decisions, and next steps. Platform memory is weak background
+unless the user explicitly verifies it.
+
+Interpret common forms this way:
+
+- `/kedu log`: save a durable session handoff record.
+- `/kedu search <query>`: search Kedu records, defaulting to the current project.
+- `/kedu <instruction>`: decide whether the instruction is asking to log, search,
+  hydrate/show, initialize, or explain Kedu, then perform that action.
+
+## Read and search
+
+`.kedu/STATE.md` is a generated summary, not the full record set. Read it for orientation,
+but **do not answer specific questions from STATE.md alone.**
+
+When the user asks about any specific topic — a tool, a decision, a bug, an error code, a
+component, a person, or any term — convert the question into search terms and run a search
+before answering:
+
+```bash
+kedu search --scope current_project --query "<terms>"
+```
+
+1. Default to `--scope current_project`.
+2. Widen to `--scope all` only for cross-project questions.
+3. Add `--agent <agent>` when the user wants records written by a specific agent
+   (for example `--agent codex`).
+4. If results look incomplete, reformulate with aliases and related terms.
+5. Use `kedu show <id>` to hydrate the full body of a candidate record.
+
+Kedu search finds candidates; you decide relevance for the current turn.
+
+## Log
+
+1. Summarize the session or requested fact into a JSON object with `title`, `agent`
+   (`kiro`), `tags` (3-5), `search_terms`, `next_steps`, and `body_md`.
+2. Write it inside the workspace, for example `.kedu/kedu-entry.json` (Kiro may reject
+   writes to `/tmp`).
+3. Run:
+
+   ```bash
+   kedu log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
+   ```
+4. Remove the temp file after a successful log and report the returned record id.
+
+Do not include secrets; the CLI runs write-time redaction before persistence.
+
+## If `kedu` is not on PATH
+
+Agent shells may not inherit the interactive `kedu` alias or PATH. If `kedu` is not
+available, use the installed full path:
+
+```bash
+{command} search --scope current_project --query "<terms>"
+{command} log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
+```
+
+## Initialize
+
+Run `kedu init --host kiro` from the project root for project-level setup, or
+`kedu init --host kiro --global` for user-level defaults.
+"""
+
+
 def _kiro_agent_prompt() -> str:
     command = _kedu_cli_command()
     return f"""{KIRO_STEERING}
@@ -455,7 +533,10 @@ def _kiro_agent_config() -> str:
             ],
             "toolAliases": {},
             "allowedTools": [],
-            "resources": [],
+            "resources": [
+                "skill://.kiro/skills/*/SKILL.md",
+                "skill://~/.kiro/skills/*/SKILL.md",
+            ],
             "hooks": {},
             "toolsSettings": {},
             "includeMcpJson": True,
@@ -554,15 +635,15 @@ def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
         }
     elif agent == "kiro":
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
-        kiro_agent_prompt = _kiro_agent_prompt()
         kiro_agent_config = _kiro_agent_config()
+        kiro_skill = _kiro_skill()
         targets = {
             kiro_home / "steering" / "kedu.md": KIRO_STEERING,
             kiro_home / "agents" / "kedu.json": kiro_agent_config,
-            kiro_home / "prompts" / "kedu-agent-prompt.md": kiro_agent_prompt,
+            kiro_home / "skills" / "kedu" / "SKILL.md": kiro_skill,
             home / "agents" / "kiro-kedu.md": KIRO_STEERING,
             home / "agents" / "kiro-kedu-agent.json": kiro_agent_config,
-            home / "agents" / "kiro-kedu-agent-prompt.md": kiro_agent_prompt,
+            home / "agents" / "kiro-kedu-skill.md": kiro_skill,
         }
     elif agent == "codex":
         agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
@@ -679,11 +760,11 @@ def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path 
     elif agent == "kiro":
         steering = kedu_paths.project_root / ".kiro" / "steering" / "kedu.md"
         cli_agent = kedu_paths.project_root / ".kiro" / "agents" / "kedu.json"
-        prompt = kedu_paths.project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md"
+        skill = kedu_paths.project_root / ".kiro" / "skills" / "kedu" / "SKILL.md"
         _write_file(steering, KIRO_STEERING)
         _write_file(cli_agent, _kiro_agent_config())
-        _write_file(prompt, _kiro_agent_prompt())
-        files.extend([str(steering), str(cli_agent), str(prompt)])
+        _write_file(skill, _kiro_skill())
+        files.extend([str(steering), str(cli_agent), str(skill)])
     elif agent == "codex":
         skill = kedu_paths.project_root / ".agents" / "skills" / "kedu" / "SKILL.md"
         _write_file(skill, CODEX_KEDU_SKILL)

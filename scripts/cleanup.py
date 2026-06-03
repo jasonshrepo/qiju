@@ -258,6 +258,7 @@ def cleanup_user_install(
         _remove_file_if_contains(kiro_home / "steering" / "kedu.md", "Kedu", result, "remove global Kiro Kedu steering", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "agents" / "kedu.json", "Kedu", result, "remove global Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove global Kiro Kedu prompt", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "kedu", result, "remove global Kiro Kedu skill", dry_run=dry_run)
     if "cursor" in hosts:
         cursor_home = Path(os.environ.get("CURSOR_HOME", "~/.cursor")).expanduser()
         _remove_file_if_contains(cursor_home / "rules" / "kedu.mdc", "Kedu", result, "remove global Cursor Kedu rule", dry_run=dry_run)
@@ -291,6 +292,7 @@ def cleanup_project_install(
         _remove_file_if_contains(project_root / ".kiro" / "steering" / "kedu.md", "Kedu", result, "remove project Kiro Kedu steering", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "agents" / "kedu.json", "Kedu", result, "remove project Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove project Kiro Kedu prompt", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "kedu", result, "remove project Kiro Kedu skill", dry_run=dry_run)
     if "cursor" in hosts:
         _remove_file_if_contains(project_root / ".cursor" / "rules" / "kedu.mdc", "Kedu", result, "remove project Cursor Kedu rule", dry_run=dry_run)
 
@@ -355,6 +357,7 @@ def _looks_like_kedu_project(path: Path) -> bool:
             path / ".kedu" / "short.jsonl",
             path / ".kiro" / "agents" / "kedu.json",
             path / ".kiro" / "steering" / "kedu.md",
+            path / ".kiro" / "skills" / "kedu" / "SKILL.md",
             path / ".claude" / "skills" / "kedu" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-log" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-search" / "SKILL.md",

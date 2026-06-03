@@ -112,8 +112,8 @@ def test_local_init_supports_agent_override(kedu_env):
     steering = kedu_env["project"] / ".kiro" / "steering" / "kedu.md"
     assert steering.exists()
     steering_text = steering.read_text(encoding="utf-8")
-    assert "not a Kiro skill" in steering_text
-    assert "Do not search a skill registry" in steering_text
+    assert "`kedu` skill" in steering_text
+    assert "do not answer specific questions from it alone" in steering_text
     assert "spec = intended plan; Kedu = historical evidence" in steering_text
     assert "obsolete" in steering_text
     assert "does not use automatic Kedu hooks" in steering_text
@@ -128,7 +128,14 @@ def test_local_init_supports_agent_override(kedu_env):
     assert "does not use automatic Kedu hooks" in agent_config["prompt"]
     assert "agentStop" not in agent_config["prompt"]
     assert "scripts/kedu.py" in agent_config["prompt"]
-    assert (kedu_env["project"] / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    assert "skill://.kiro/skills/*/SKILL.md" in agent_config["resources"]
+    # The standalone /kedu-agent-prompt saved prompt is retired in favor of the skill.
+    assert not (kedu_env["project"] / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    skill = kedu_env["project"] / ".kiro" / "skills" / "kedu" / "SKILL.md"
+    assert skill.exists()
+    skill_text = skill.read_text(encoding="utf-8")
+    assert "name: kedu" in skill_text
+    assert "do not answer specific questions from STATE.md alone" in skill_text
 
 
 def test_local_init_adds_git_info_exclude(kedu_env):

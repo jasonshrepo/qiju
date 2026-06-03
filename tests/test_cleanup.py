@@ -106,6 +106,7 @@ def test_project_cleanup_preserves_project_kedu_when_short_records_exist(kedu_en
     assert not (project / ".kiro" / "steering" / "kedu.md").exists()
     assert not (project / ".kiro" / "agents" / "kedu.json").exists()
     assert not (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    assert not (project / ".kiro" / "skills" / "kedu").exists()
     assert any("short=1" in item["reason"] for item in result.preserved)
 
 
