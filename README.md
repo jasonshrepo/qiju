@@ -157,23 +157,30 @@ don't run the raw CLI by hand.
 
 ### 2. Day to day, you talk to the agent
 
-In Claude Code, the skill gives you one command surface:
+Kedu gives you one command surface:
 
 ```text
-/kedu log                        save a record of this session
-/kedu log <what to record>       record something specific you want kept
-/kedu search <query>             find past records
-/kedu <instruction>              e.g. "/kedu remember this decision",
-                                 "/kedu find the last deployment note"
+kedu log                        save a record of this session
+kedu log <what to record>       record something specific you want kept
+kedu search <query>             find past records
+kedu <instruction>              e.g. "remember this decision",
+                                "find the last deployment note"
 ```
 
-You're the editor; the agent is the note-taker. When you `/kedu log`, the agent summarizes
-the session (or the thing you pointed at) into a structured record and saves it — you decide
-what goes in. At the start of the next session, the agent reads the project summary and the
-relevant records back, so it already knows the history.
+How you trigger it depends on the host:
 
-Codex, Kiro, and Cursor get the same capability through their own native wiring (a skill,
-agent steering, or a rule). You always just talk to the agent; the agent calls `kedu`.
+| Host | How you call Kedu |
+|---|---|
+| **Claude Code** (CLI & desktop) | `/kedu` — e.g. `/kedu log`, `/kedu search auth cookie` |
+| **Kiro** (CLI & IDE) | `/kedu` as a slash command. In the **IDE** you can also just ask in natural language — `kedu search …`, `kedu log …` — and the always-on steering picks it up. |
+| **Cursor** (CLI & desktop) | `/kedu` |
+| **Codex** (CLI & desktop) | `$kedu` — e.g. `$kedu log`, `$kedu search auth cookie` |
+
+You're the editor; the agent is the note-taker. When you log, the agent summarizes the
+session (or the thing you pointed at) into a structured record and saves it — you decide what
+goes in. At the start of the next session, the agent reads the project summary and the
+relevant records back, so it already knows the history. You always just talk to the agent;
+the agent calls the `kedu` CLI.
 
 ### Direct CLI (for scripts, or to see what the agent runs)
 
@@ -196,8 +203,17 @@ kedu rebuild-state --project my-project   # regenerate it
 # Maintenance, redaction, and removal (records are never deleted by uninstall)
 kedu maintain --dry-run
 kedu redact --value "secret-value" --reason "leaked in session"
-kedu uninstall --dry-run
+
+# Remove the integration — records are always preserved
+kedu uninstall --dry-run                          # preview everything that would be removed
+kedu uninstall --hosts kiro                        # remove just one host (claude|kiro|codex|cursor)
+kedu uninstall --hosts kiro,cursor --project-only  # one or more hosts, project-local files only
+kedu uninstall --user-only                         # only user-level install + global host wiring
 ```
+
+`uninstall` scopes by **host** (`--hosts all` or a comma list) and by **location**
+(`--project-only`, `--user-only`, or both when neither is given). Your `long` and `short`
+records are never deleted — only the integration files are.
 
 Records anchor to your project root even if the agent runs `kedu log` from a subfolder — see
 [Solution architecture](#solution-architecture) for how that resolution works.
