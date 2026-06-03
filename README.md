@@ -142,7 +142,9 @@ uv run pytest    # run the test suite
 
 ## Using Kedu
 
-**Connect a project to your agent** (project-local by default):
+### 1. Connect a project to your agent (one-time setup)
+
+Run this yourself in a terminal, once per project:
 
 ```bash
 cd /path/to/project
@@ -150,41 +152,51 @@ kedu init --host claude        # or: codex | kiro | cursor
 kedu init --host claude --global   # optional user-level defaults
 ```
 
-**Save a record:**
+This wires the `kedu` command into your agent. From then on, you work through the agent — you
+don't run the raw CLI by hand.
 
-```bash
-kedu log --source manual --agent claude --project my-project --body record.json
+### 2. Day to day, you talk to the agent
+
+In Claude Code, the skill gives you one command surface:
+
+```text
+/kedu log                        save a record of this session
+/kedu log <what to record>       record something specific you want kept
+/kedu search <query>             find past records
+/kedu <instruction>              e.g. "/kedu remember this decision",
+                                 "/kedu find the last deployment note"
 ```
 
-`--body` is a path to a JSON record (or pipe JSON via stdin). Kedu validates it, strips
-secrets, stores it, and refreshes the project summary.
+You're the editor; the agent is the note-taker. When you `/kedu log`, the agent summarizes
+the session (or the thing you pointed at) into a structured record and saves it — you decide
+what goes in. At the start of the next session, the agent reads the project summary and the
+relevant records back, so it already knows the history.
 
-**Find records again:**
+Codex, Kiro, and Cursor get the same capability through their own native wiring (a skill,
+agent steering, or a rule). You always just talk to the agent; the agent calls `kedu`.
+
+### Direct CLI (for scripts, or to see what the agent runs)
+
+The agent ultimately runs the `kedu` CLI, and you can too — for automation or to inspect the
+store directly:
 
 ```bash
+# Save a record (the agent builds the JSON; you can also write it yourself or pipe via stdin)
+kedu log --source manual --agent claude --project my-project --body record.json
+
+# Find records
 kedu search --scope current_project --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
 kedu show '<session-id>:1'
-```
 
-**See where the project stands:**
-
-```bash
-kedu state --project my-project          # print the summary
+# See where a project stands
+kedu state --project my-project           # print the summary
 kedu rebuild-state --project my-project   # regenerate it
-```
 
-**Maintenance and redaction:**
-
-```bash
-kedu maintain --dry-run        # preview archiving; drop --dry-run to apply
+# Maintenance, redaction, and removal (records are never deleted by uninstall)
+kedu maintain --dry-run
 kedu redact --value "secret-value" --reason "leaked in session"
-```
-
-**Remove Kedu wiring** (your records are never deleted):
-
-```bash
-kedu uninstall --dry-run       # preview; drop --dry-run to apply
+kedu uninstall --dry-run
 ```
 
 Records anchor to your project root even if the agent runs `kedu log` from a subfolder — see
