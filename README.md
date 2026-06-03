@@ -1,230 +1,257 @@
-# Kedu / 刻牍
+<div align="center">
+  <img src="assets/logo.svg" alt="Kedu" width="440">
+</div>
 
-Kedu is a local-first, lossless session-record harness for AI coding agents.
+# Kedu
 
-It preserves verified development session records so Claude Code, Codex, Cursor, Kiro,
+**Local-first, lossless session records for AI coding agents.**
+
+Kedu preserves verified development session records so Claude Code, Codex, Cursor, Kiro,
 and future agents can resume work from developer-owned project history instead of relying
 on platform-specific memory.
 
-Kedu is not a vector memory system, not RAG, and not a search engine. It is a durable
-handoff layer: capture what happened, preserve it locally, retrieve candidate records
-deterministically, and let the model reason over verified context.
+It is a durable handoff layer: capture what happened, preserve it locally, retrieve
+candidate records deterministically, and let the model reason over verified context.
 
-For the setup model, see [INSTALL_AND_AGENT_INIT.md](INSTALL_AND_AGENT_INIT.md).
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-17313C.svg" alt="License: Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-216C83.svg" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-475A60.svg" alt="Platform: macOS | Linux">
+  <img src="https://img.shields.io/badge/status-developer%20preview-C8553D.svg" alt="Status: developer preview">
+</p>
 
-## Install
+---
+
+## Contents
+
+- [Current status](#current-status)
+- [Why Kedu](#why-kedu)
+- [What Kedu is](#what-kedu-is)
+- [What Kedu is not](#what-kedu-is-not)
+- [Try it from source](#try-it-from-source)
+- [Workflow](#workflow)
+- [Record structure](#record-structure)
+- [Design principles](#design-principles)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## Current status
+
+Kedu is **source-first / developer preview**. You install it from this repository; there is
+no public package-manager distribution yet (see [Roadmap](#roadmap)).
+
+What exists in the repo today, verified and tested (`uv run pytest`, 79 tests):
+
+- A stable local record format — JSONL (hot + durable tiers) plus DuckDB Parquet archive.
+- A capture workflow — `kedu log` (validate → redact → append → rebuild state).
+- Deterministic retrieval — `kedu search` and `kedu show`.
+- A derived project boot view — `kedu state` / `kedu rebuild-state` writing `.kedu/STATE.md`.
+- Write-time and retroactive redaction — `kedu redact` (regex rules + entropy detection).
+- Archival tiering — `kedu maintain` rotates the hot window and ages records to Parquet.
+- Host wiring — `kedu init --host {claude,codex,cursor,kiro}` and `kedu uninstall`.
+- A source-first installer — `install.sh` (with optional macOS scheduled maintenance).
+
+## Why Kedu
+
+AI coding agents are powerful, but continuity is fragile. Project context tends to get
+trapped inside:
+
+- one chat thread,
+- one IDE,
+- one model vendor,
+- one platform-specific memory system,
+- or a lossy summary.
+
+When the thread ends, the agent restarts, or you switch tools, that context is gone or
+degraded. Kedu keeps project history **local, inspectable, and developer-owned** — plain
+files in your repo and home directory that any agent can read.
+
+## What Kedu is
+
+A durable handoff layer between sessions and between agents:
+
+1. **Capture** what happened as a structured record.
+2. **Preserve** verified records locally, losslessly.
+3. **Retrieve** candidate records deterministically (structured filters + exact scan).
+4. **Hand off** that verified context to the next agent or session.
+5. **Reason** — the model decides relevance over real records, not invented memory.
+
+## What Kedu is not
+
+| Kedu is not | Because |
+|---|---|
+| Vector memory / RAG | No embeddings or similarity ranking. Retrieval is exact structured filtering plus keyword/regex scan. |
+| A search engine | Search returns *candidates*; the model decides relevance. There is no relevance ranking. |
+| An agent framework | Kedu does not run, orchestrate, or prompt agents. It records sessions and hands off context. |
+| Platform memory | Records are local files you own and can read, diff, and redact — not vendor-held memory. |
+
+## Try it from source
+
+> Source-first only. There is no `npm install -g kedu`, `brew install kedu`, or `pip install
+> kedu` yet.
 
 ```bash
+git clone https://github.com/jasonshrepo/kedu.git
+cd kedu
+
+# Install the `kedu` shim (to ~/.local/bin) and an engine copy (to ~/.kedu/kedu)
 bash install.sh
-bash install.sh --install-launchd  # optional macOS scheduled maintenance
+
+# Optional: macOS LaunchAgent for scheduled maintenance
+bash install.sh --install-launchd
 ```
 
-The central store defaults to `~/.kedu`. Override with:
+Make sure `~/.local/bin` is on your `PATH`, then:
 
 ```bash
-export KEDU_HOME=/path/to/kedu-home
+kedu --help
 ```
 
-All agents share this one store. The system does not create per-agent stores; agent
-identity is recorded on each Kedu record through the `agent` field.
+The shared store defaults to `~/.kedu`; override it with `export KEDU_HOME=/path/to/store`.
+All agents share one store — agent identity is recorded on each record, not in separate
+per-agent stores.
 
-By default, the installed engine copy lives under:
+### Developing on Kedu
 
-```text
-~/.kedu/kedu
+```bash
+uv sync          # install dependencies (Python >=3.11, duckdb)
+uv run pytest    # run the test suite
 ```
 
-The `kedu` shim executes from that installed copy, so the downloaded checkout can be
-deleted after installation.
+## Workflow
 
-## Initialize
+These are real commands implemented in this repo.
 
-Project-local setup is the default:
+**Wire a project to an agent** (project-local by default):
 
 ```bash
 cd /path/to/project
-kedu init --host codex
+kedu init --host claude        # or codex | cursor | kiro
+kedu init --host claude --global   # optional user-level defaults
 ```
 
-Supported hosts:
+**Capture a record:**
 
 ```bash
-kedu init --host claude
-kedu init --host kiro
-kedu init --host codex
-kedu init --host cursor
+kedu log --source manual --agent claude --project my-project --body record.json
 ```
 
-Optional user/global defaults can be added later:
+`--body` takes a path to a JSON record; if omitted, `kedu log` reads JSON from stdin. The
+body is validated, redacted, then appended to the hot and durable tiers, and `STATE.md` is
+rebuilt.
 
-```bash
-kedu init --host codex --global
-kedu init --host claude --place global
-```
-
-Project-local integrations write:
-
-- Claude: appends a line-counted Kedu block to `CLAUDE.md` and writes the unified `/kedu` skill under `.claude/skills/kedu/`
-- Codex: appends a Kedu block to `AGENTS.md`
-- Kiro: writes `.kiro/steering/kedu.md`, `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
-- Cursor: writes `.cursor/rules/kedu.mdc`
-
-Claude `CLAUDE.md` sections are wrapped as:
-
-```text
-====kedu start ====
-...
-====kedu stop line:N====
-```
-
-`N` is the number of content lines written by Kedu. Uninstall removes only this marked
-section and leaves the rest of `CLAUDE.md` intact.
-
-In Claude Code, use one command surface:
-
-```text
-/kedu log
-/kedu search <query>
-/kedu <specific instruction about creating or retrieving durable memory>
-```
-
-For Kiro CLI, select the generated agent with:
-
-```bash
-kiro-cli --agent kedu chat
-```
-
-or make it the CLI default yourself:
-
-```bash
-kiro-cli agent set-default kedu
-```
-
-Kiro does not use automatic Kedu hooks. Log explicitly before ending work, and write
-temporary entry JSON inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
-
-Each local init also creates:
-
-```text
-<project>/.kedu/
-├── short.jsonl
-├── STATE.md
-└── config.json
-```
-
-If the project is a git repo, `.kedu/` is added to `.git/info/exclude`.
-
-## Capture
-
-```bash
-kedu log --source manual --agent codex --project my-project --body /tmp/record.json
-```
-
-The record body is validated, redacted, then appended to:
-
-- `<project-root>/.kedu/short.jsonl`
-- `$KEDU_HOME/long/<project>.jsonl`
-
-`--body` expects a path to a JSON file. If omitted, `kedu log` reads JSON from stdin.
-
-### Where records anchor
-
-`kedu log` resolves the project root — and therefore where `.kedu/short.jsonl` lands and
-which `<project>.jsonl` the long tier uses — by this precedence:
-
-1. `KEDU_PROJECT_ROOT` environment variable, if set.
-2. The nearest ancestor directory containing the `.kedu/config.json` marker written by
-   `kedu init`. This keeps records anchored to the project root even when an agent runs
-   `kedu log` from a subdirectory.
-3. The git repository root (`git rev-parse --show-toplevel`).
-4. The current working directory, as a last resort.
-
-The project slug is read from the init marker when present, so it stays stable across
-directory renames. If none of the above identifies a root (an uninitialized, non-git
-directory) and no `--project` is given, `kedu log` stops rather than create a stray
-project identity — run `kedu init` first, pass `--project`, or set `KEDU_PROJECT_ROOT`.
-
-## Search
+**Retrieve records** (candidate identification, not ranking):
 
 ```bash
 kedu search --scope current_project --query "auth cookie"
-kedu search --scope current_project --agent codex --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
-kedu search --scope current_project --query "deploy" --ids-only
+kedu search --scope current_project --agent codex --query "deploy" --ids-only
 kedu show '<session-id>:1'
 ```
 
-Search is candidate identification, not search-engine ranking. Kedu uses structured
-filters plus exact keyword/body scanning so the model can decide relevance over verified
-records.
-
-## State
+**Read the derived boot view:**
 
 ```bash
-kedu state --project my-project
-kedu rebuild-state --project my-project
+kedu state --project my-project          # print STATE.md
+kedu rebuild-state --project my-project   # regenerate it from all tiers
 ```
 
-`.kedu/STATE.md` is a derived boot view with open items, active decisions, and an entry
-index.
-
-## Maintenance
+**Maintain and redact:**
 
 ```bash
-kedu maintain --dry-run
-kedu maintain
-```
-
-Maintenance rotates the 7-day hot project record and archives aged durable records to
-Parquet.
-
-## Uninstall
-
-Preview the uninstall:
-
-```bash
-kedu uninstall --dry-run
-```
-
-Run the uninstall:
-
-```bash
-kedu uninstall
-```
-
-By default, uninstall removes the user-level install and generated Kedu wiring in the
-current project. For unscoped `kedu uninstall`, it also scans common project roots for
-Kedu-enabled projects and removes generated project wiring there too. Use `--user-only`,
-`--project-only`, or `--no-project-scan` to narrow the scope. You can also target another
-project with:
-
-```bash
-kedu uninstall --project-only --project-root /path/to/project --hosts kiro,codex --dry-run
-kedu uninstall --dry-run --scan-root /path/to/projects
-```
-
-For Claude, uninstall removes only the marked Kedu block from `CLAUDE.md` and removes
-the Kedu skill, leaving unrelated instructions intact.
-
-Uninstall never removes shared record or audit data under `~/.kedu/long`,
-`~/.kedu/archive`, `~/.kedu/query_log.jsonl`, or `~/.kedu/redaction_log.jsonl`. In
-projects, uninstall preserves only local short records at `.kedu/short.jsonl`. Generated
-project state such as `.kedu/STATE.md`, `.kedu/config.json`, and temporary entry files is
-removed. If a project has no local short records, its `.kedu/` folder is removed; global
-long/archive records remain untouched.
-
-## Redaction
-
-```bash
+kedu maintain --dry-run        # preview rotation + archival; drop --dry-run to apply
 kedu redact --value "secret-value" --reason "leaked in session"
 ```
 
-Secrets and PII are redacted before records are persisted. Retroactive redaction rewrites
-JSONL and Parquet tiers and records an audit event.
+**Remove Kedu wiring** (records are never deleted):
 
-## Priority Model
+```bash
+kedu uninstall --dry-run       # preview; drop --dry-run to apply
+```
 
-Kedu records are verified session handoff records and project history. Use them as the
-source of truth for previous session progress, unresolved bugs, implementation decisions,
-next steps, and what actually happened. Platform memories are weak background unless the
-user explicitly verifies them.
+### Where records anchor
+
+`kedu log` resolves the project root by precedence: `KEDU_PROJECT_ROOT` → the nearest
+ancestor with a `.kedu/config.json` init marker → the git repository root → the current
+directory. The slug is read from the init marker, so records stay anchored to the project
+root even when an agent runs `kedu log` from a subdirectory, and the slug is stable across
+renames. If none of these identify a root and no `--project` is given, `kedu log` stops
+rather than create a stray identity — run `kedu init` first, pass `--project`, or set
+`KEDU_PROJECT_ROOT`.
+
+## Record structure
+
+A local init creates a project-local `.kedu/` directory, and the shared store lives under
+`~/.kedu` (or `$KEDU_HOME`):
+
+```text
+<project>/.kedu/
+├── short.jsonl     # hot tier: 7-day rolling window, project-local
+├── STATE.md        # derived boot view (open items, decisions, entry index)
+└── config.json     # init marker + canonical project slug
+
+~/.kedu/
+├── long/<project>.jsonl                                   # durable tier: all records
+├── archive/project=<name>/month=<YYYY-MM>/entries.parquet # aged records (DuckDB Parquet)
+├── query_log.jsonl
+└── redaction_log.jsonl
+```
+
+Each record is a JSON object (schema version 2) with these fields:
+
+```json
+{
+  "schema_version": 2,
+  "id": "<session-uuid>:<seq>",
+  "ts": "2026-06-03T00:28:54+10:00",
+  "project": "my-project",
+  "agent": "claude",
+  "source": "manual",
+  "title": "Fixed project-root resolution for non-git repos",
+  "tags": ["bugfix", "paths"],
+  "search_terms": ["project_root", "KEDU_PROJECT_ROOT"],
+  "next_steps": ["sync to release", "run smoke matrix"],
+  "redactions": [],
+  "body_md": "Full human-readable narrative of what happened..."
+}
+```
+
+Records are written to the hot and durable tiers on every `log`, deduplicated by `id`, and
+aged into Parquet by `kedu maintain`.
+
+## Design principles
+
+- **Local-first by default** — records live in your repo and `~/.kedu`, not a vendor service.
+- **Lossless before clever** — store the full record, not a lossy summary.
+- **Verified records over synthetic memory** — captured handoffs, not model-invented recall.
+- **Deterministic retrieval before model reasoning** — exact filters and scans find
+  candidates; the model judges relevance.
+- **Inspectable files over black-box recall** — plain JSONL and Markdown you can read,
+  diff, and redact.
+- **Developer-owned history over platform-owned memory** — your files, your store, your
+  control.
+
+## Roadmap
+
+Implemented:
+
+- [x] Stable local record format (JSONL hot/durable + Parquet archive, schema v2)
+- [x] Session capture workflow (`kedu log`)
+- [x] Deterministic retrieval (`kedu search` / `kedu show`)
+- [x] Derived project state (`kedu state` / `STATE.md`)
+- [x] Write-time and retroactive redaction (`kedu redact`)
+- [x] Archival tiering to Parquet (`kedu maintain`)
+- [x] Multi-host wiring (Claude, Codex, Cursor, Kiro) and clean uninstall
+- [x] Stable project-root resolution via init marker
+
+Planned / not yet implemented:
+
+- [ ] Git-aware file-change context captured into records
+- [ ] Packaged install (PyPI / Homebrew) and versioned releases
+- [ ] MCP server interface for agents
+- [ ] Agent-specific handoff templates beyond host wiring
+- [ ] Documentation site
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Jason Shen.
