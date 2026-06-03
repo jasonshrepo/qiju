@@ -9,7 +9,7 @@
 *Kedu (刻牍, pronounced “Kay-Doo”) means “to inscribe records” — carving down what happened
 so it lasts.*
 
-Kedu keeps a verified history of your development sessions in your project, as plain files
+Kedu keeps a written history of your development sessions in your project, as plain files
 you own. Any agent — Claude Code, Codex, Kiro, Cursor, or whatever comes next — can pick up
 where the last one left off, instead of relying on memory that's locked inside one tool.
 
@@ -25,6 +25,7 @@ where the last one left off, instead of relying on memory that's locked inside o
 ## Contents
 
 - [Why Kedu](#why-kedu)
+- [The idea](#the-idea)
 - [What Kedu does](#what-kedu-does)
 - [What Kedu is not](#what-kedu-is-not)
 - [Current status](#current-status)
@@ -52,21 +53,37 @@ Today that hard-won context gets trapped:
   you actually needed is the first thing dropped.
 
 Kedu fixes this by keeping project history where it belongs: **in your project, as plain
-files you own.** The next agent reads the same verified record of what happened — not a
+files you own.** The next agent reads the same written record of what happened — not a
 guess, not a vendor's black box.
+
+## The idea
+
+Treat your agent like a secretary. At the end of a session — or any time something matters —
+you tell it to write down what you did and what you want remembered. That note becomes a
+record in your project. Next time you open the project, the agent reads those records first,
+so it already knows the history and can pick up where you left off.
+
+Kedu began as a one-line `/log` skill: it appended a summary of the session to a `history.md`
+file (a per-project copy and a global one), read back at the start of every session. That
+worked — until the history grew too big to re-read every time. Kedu is that same idea,
+structured so it scales: many small records instead of one growing file, a short summary to
+read on start, and deterministic search to pull only what's relevant.
 
 ## What Kedu does
 
-Think of Kedu as a handoff layer between sessions and between agents:
+You direct the agent; it takes the notes:
 
-1. **Capture** what happened in a session as a structured record.
-2. **Preserve** it locally and losslessly — nothing is summarized away.
-3. **Retrieve** the relevant past records when you need them.
-4. **Hand off** that verified context to the next agent or session.
-5. **Let the model reason** over real records, instead of inventing memory.
+1. **Capture** — you ask the agent to write down what you did and what's worth remembering.
+   Record a whole session, or point at the specific things you want kept.
+2. **Preserve** — the agent writes the note; Kedu stores it exactly and never re-summarizes
+   or evicts it the way a context window does.
+3. **Retrieve** — pull the relevant past records when you need them.
+4. **Hand off** — the next agent or session reads those records first.
+5. **Reason** — the model works from real notes you can see and trust, not memory it invented.
 
-The records are just files in your repository and home directory. You can open them, read
-them, diff them in git, and delete or redact anything you want.
+Nothing is logged silently in the background — **you decide what gets recorded.** The records
+are just files in your repository and home directory: open them, read them, diff them in git,
+edit or redact anything.
 
 ## What Kedu is not
 
@@ -176,8 +193,12 @@ Records anchor to your project root even if the agent runs `kedu log` from a sub
 ## Design principles
 
 - **Local-first by default** — records live in your repo and `~/.kedu`, not a vendor service.
-- **Lossless before clever** — keep the full record, not a lossy summary.
-- **Verified records over synthetic memory** — captured handoffs, not model-invented recall.
+- **You direct what's recorded** — the agent is your secretary; capture is intentional, never
+  silent background memory.
+- **Lossless after capture** — once the agent writes a record, Kedu keeps it verbatim; it
+  never re-summarizes, compacts, or evicts it.
+- **Records you can see and trust** — explicit notes you and the agent write and can edit, not
+  invisible vendor memory.
 - **Deterministic retrieval before model reasoning** — exact filters find candidates; the
   model judges relevance.
 - **Inspectable files over black-box recall** — plain JSON and Markdown you can read, diff,
