@@ -130,7 +130,7 @@ There are no per-agent stores. Agent identity is stored per record:
 
 `agent` answers "which host created this record?"
 
-`source` answers "how was this record captured?" (`manual`, `clean_exit`, or `agent`).
+`source` answers "how was this record captured?" (`manual` or `agent`).
 
 ## Priority Policy
 

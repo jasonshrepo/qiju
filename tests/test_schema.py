@@ -22,6 +22,16 @@ def test_schema_source_enum_enforced():
         schema.validate(sample_entry(source="auto"))
 
 
+def test_schema_sources_are_manual_and_agent_only():
+    # Capture is always deliberate; there is no automatic exit hook, so `clean_exit`
+    # is no longer a valid source.
+    assert schema.VALID_SOURCES == ("manual", "agent")
+    for source in ("manual", "agent"):
+        assert schema.validate(sample_entry(source=source))["source"] == source
+    with pytest.raises(schema.ValidationError, match="source must be"):
+        schema.validate(sample_entry(source="clean_exit"))
+
+
 def test_normalize_entry_fills_expected_defaults():
     entry = schema.normalize_entry({"title": "Minimal entry"})
 

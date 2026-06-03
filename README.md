@@ -275,7 +275,7 @@ Each record is a JSON object (schema version 2):
 }
 ```
 
-Valid `source` values are `manual`, `clean_exit`, and `agent`. The `id` is
+Valid `source` values are `manual` and `agent`. The `id` is
 `{session-uuid}:{seq}`, where the session UUID comes from the first set of
 `KEDU_SESSION_ID` / `CLAUDE_SESSION_ID` / `CODEX_SESSION_ID` / `KIRO_SESSION_ID`, and `seq`
 increments per session.

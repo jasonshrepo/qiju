@@ -5,7 +5,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = 2
-VALID_SOURCES = ("manual", "clean_exit", "agent")
+VALID_SOURCES = ("manual", "agent")
 REQUIRED_FIELDS = (
     "schema_version",
     "id",
