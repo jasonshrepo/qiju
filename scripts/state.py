@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 try:
@@ -35,7 +36,7 @@ def _active_decisions(entries: list[dict]) -> list[str]:
 def build_state_markdown(project: str, entries: list[dict], *, generated_ts: str | None = None) -> str:
     generated_ts = generated_ts or util.utcish_now_iso()
     sorted_entries = sorted(entries, key=lambda item: str(item.get("ts", "")), reverse=True)
-    cutoff = util.parse_iso(generated_ts) - __import__("datetime").timedelta(days=30)
+    cutoff = util.parse_iso(generated_ts) - timedelta(days=30)
 
     open_items: list[str] = []
     seen_items: set[str] = set()
@@ -78,5 +79,5 @@ def rebuild_state(project: str | None = None, cwd: str | Path | None = None) -> 
     paths_mod.ensure_base_dirs(kedu_paths)
     entries = storage.read_project_entries(kedu_paths, include_short=True)
     markdown = build_state_markdown(kedu_paths.project, entries)
-    kedu_paths.state_md.write_text(markdown, encoding="utf-8")
+    util.write_text_atomic(kedu_paths.state_md, markdown)
     return kedu_paths.state_md

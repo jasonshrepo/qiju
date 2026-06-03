@@ -26,9 +26,12 @@ def read_parquet(path: Path) -> list[dict[str, Any]]:
     if duckdb is None:
         raise RuntimeError("duckdb is required to read Parquet archives")
     con = duckdb.connect(":memory:")
-    rows = con.execute(f"SELECT * FROM read_parquet({_sql_quote(str(path))})").fetchall()
-    columns = [desc[0] for desc in con.description]
-    return [dict(zip(columns, row)) for row in rows]
+    try:
+        rows = con.execute(f"SELECT * FROM read_parquet({_sql_quote(str(path))})").fetchall()
+        columns = [desc[0] for desc in con.description]
+        return [dict(zip(columns, row)) for row in rows]
+    finally:
+        con.close()
 
 
 def write_parquet_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
@@ -42,16 +45,27 @@ def write_parquet_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
     try:
         util.write_jsonl_atomic(json_tmp_path, entries)
         con = duckdb.connect(":memory:")
-        con.execute(
-            f"""
-            COPY (
-                SELECT * FROM read_json_auto({_sql_quote(str(json_tmp_path))})
+        try:
+            con.execute(
+                f"""
+                COPY (
+                    SELECT * FROM read_json_auto({_sql_quote(str(json_tmp_path))})
+                )
+                TO {_sql_quote(str(parquet_tmp_path))}
+                (FORMAT PARQUET, COMPRESSION ZSTD)
+                """
             )
-            TO {_sql_quote(str(parquet_tmp_path))}
-            (FORMAT PARQUET, COMPRESSION ZSTD)
-            """
-        )
-        read_parquet(parquet_tmp_path)
+        finally:
+            con.close()
+        validated = read_parquet(parquet_tmp_path)
+        if len(validated) != len(entries):
+            raise RuntimeError(
+                f"Parquet validation failed for {parquet_tmp_path}: expected {len(entries)} rows, got {len(validated)}"
+            )
+        expected_ids = {entry.get("id") for entry in entries}
+        validated_ids = {entry.get("id") for entry in validated}
+        if validated_ids != expected_ids:
+            raise RuntimeError(f"Parquet validation failed for {parquet_tmp_path}: ID set mismatch")
         os.replace(parquet_tmp_path, path)
     finally:
         for tmp in (json_tmp_path, parquet_tmp_path):
@@ -59,4 +73,3 @@ def write_parquet_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
                 tmp.unlink()
             except FileNotFoundError:
                 pass
-

@@ -28,11 +28,11 @@ inside the workspace, then run:
 
 Remove `.kedu/kedu-entry.json` after a successful log.
 
-Kiro CLI does not reliably fire the `agentStop` hook when the CLI session quits. Do
-not promise automatic exit capture in Kiro CLI. Before quitting, explicitly save
-durable work with the log command above.
+Kiro does not use automatic Kedu hooks. Do not promise automatic exit capture.
+Before quitting or when asked to save progress, explicitly save durable work with
+the log command above.
 
-Kiro IDE may reject writes outside the workspace. Use `.kedu/kedu-entry.json`, not
+Kiro may reject writes outside the workspace. Use `.kedu/kedu-entry.json`, not
 `/tmp/kedu-entry.json`.
 
 For Kiro Specs and planned requirements, follow spec files. If Kiro Specs and Kedu

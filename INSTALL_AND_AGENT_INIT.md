@@ -63,9 +63,9 @@ Local init means "enable Kedu for this host in the current project." It creates:
 
 It also writes project-local host integration:
 
-- Claude: appends a line-counted Kedu block to `CLAUDE.md`, registers a `SessionEnd` hook in `.claude/settings.local.json`, and writes the unified `/kedu` skill under `.claude/skills/kedu/`
+- Claude: appends a line-counted Kedu block to `CLAUDE.md` and writes the unified `/kedu` skill under `.claude/skills/kedu/`
 - Codex: appends a Kedu block to `AGENTS.md`
-- Kiro: writes `.kiro/steering/kedu.md`, a JSON hook at `.kiro/hooks/kedu-clean-exit.kiro.hook`, a Kiro CLI agent at `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
+- Kiro: writes `.kiro/steering/kedu.md`, a Kiro CLI agent at `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
 - Cursor: writes `.cursor/rules/kedu.mdc`
 
 Claude `CLAUDE.md` sections are wrapped as:
@@ -104,9 +104,8 @@ If you want Kiro CLI to use that agent by default, run this explicitly:
 kiro-cli agent set-default kedu
 ```
 
-Kiro CLI does not reliably fire the Kiro `agentStop` hook when the CLI session quits. Log
-explicitly before quitting. Kiro IDE can use the generated hook, but temporary entry JSON
-should be written inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
+Kiro does not use automatic Kedu hooks. Log explicitly before ending work, and write
+temporary entry JSON inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
 
 ## Shared Store Rule
 
@@ -196,13 +195,12 @@ project roots. Use `--user-only` for only the machine-level installation:
 
 - remove the `kedu` CLI shim
 - remove the installed engine copy at `~/.kedu/kedu`
-- remove support templates under `~/.kedu/hooks`, `~/.kedu/adapters`, and `~/.kedu/agents`
+- remove support templates under `~/.kedu/adapters` and `~/.kedu/agents`
 - remove generated global host integrations for selected hosts
 
 Use `--project-only` or `--project-root /path/to/project` for project-local wiring:
 
 - remove generated Codex/Claude instruction blocks
-- remove generated Claude `SessionEnd` settings hooks
 - remove generated Kiro steering and hook files
 - remove generated Cursor rules
 - preserve only `.kedu/short.jsonl` when local short records exist

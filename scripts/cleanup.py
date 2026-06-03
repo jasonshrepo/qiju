@@ -4,24 +4,33 @@ import os
 import json
 import shutil
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 try:
+    from .block_format import (
+        CLAUDE_BLOCK_START,
+        CLAUDE_BLOCK_STOP_PREFIX,
+        KEDU_BLOCK_END,
+        KEDU_BLOCK_START,
+        find_line_marked_block,
+    )
     from . import paths as paths_mod, util
 except ImportError:  # pragma: no cover
+    from block_format import (  # type: ignore
+        CLAUDE_BLOCK_START,
+        CLAUDE_BLOCK_STOP_PREFIX,
+        KEDU_BLOCK_END,
+        KEDU_BLOCK_START,
+        find_line_marked_block,
+    )
     import paths as paths_mod  # type: ignore
     import util  # type: ignore
 
 
-ARCHIVE_THRESHOLD_DAYS = 153
 DEFAULT_SCAN_DEPTH = 8
 HOSTS = ("claude", "kiro", "codex", "cursor")
-KEDU_BLOCK_START = "<!-- kedu:start -->"
-KEDU_BLOCK_END = "<!-- kedu:end -->"
-CLAUDE_BLOCK_START = "====kedu start ===="
-CLAUDE_BLOCK_STOP_PREFIX = "====kedu stop line:"
 SCAN_SKIP_DIRS = {
     ".cache",
     ".git",
@@ -107,25 +116,11 @@ def _remove_file_if_contains(path: Path, needle: str, result: CleanupResult, rea
     _remove_file(path, result, reason, dry_run=dry_run)
 
 
-def _find_line_marked_block(content: str) -> tuple[int, int] | None:
-    lines = content.splitlines(keepends=True)
-    offset = 0
-    start_offset: int | None = None
-    for line in lines:
-        stripped = line.strip()
-        if stripped == CLAUDE_BLOCK_START:
-            start_offset = offset
-        elif start_offset is not None and stripped.startswith(CLAUDE_BLOCK_STOP_PREFIX):
-            return start_offset, offset + len(line)
-        offset += len(line)
-    return None
-
-
 def _remove_kedu_block(path: Path, result: CleanupResult, *, dry_run: bool) -> None:
     if not path.exists() or not path.is_file():
         return
     content = path.read_text(encoding="utf-8")
-    line_marked = _find_line_marked_block(content)
+    line_marked = find_line_marked_block(content)
     if line_marked:
         start, end = line_marked
     else:
@@ -143,81 +138,6 @@ def _remove_kedu_block(path: Path, result: CleanupResult, *, dry_run: bool) -> N
     if not dry_run:
         if updated.strip():
             path.write_text(updated, encoding="utf-8")
-        else:
-            path.unlink()
-
-
-def _is_kedu_hook_command(command: Any) -> bool:
-    if not isinstance(command, str):
-        return False
-    lowered = command.lower()
-    return "kedu" in lowered and ("session_end_log.sh" in lowered or "scripts/kedu.py" in lowered)
-
-
-def _remove_kedu_claude_hooks(settings: dict[str, Any]) -> bool:
-    hooks = settings.get("hooks")
-    if not isinstance(hooks, dict):
-        return False
-    changed = False
-    for event in list(hooks):
-        entries = hooks.get(event)
-        if not isinstance(entries, list):
-            continue
-        kept_entries: list[Any] = []
-        for entry in entries:
-            if isinstance(entry, dict):
-                nested_hooks = entry.get("hooks")
-                if isinstance(nested_hooks, list):
-                    kept_hooks = []
-                    for hook in nested_hooks:
-                        command = hook.get("command") if isinstance(hook, dict) else None
-                        if _is_kedu_hook_command(command):
-                            changed = True
-                        else:
-                            kept_hooks.append(hook)
-                    if kept_hooks:
-                        updated_entry = dict(entry)
-                        updated_entry["hooks"] = kept_hooks
-                        kept_entries.append(updated_entry)
-                    else:
-                        changed = True
-                elif _is_kedu_hook_command(entry.get("command")):
-                    changed = True
-                else:
-                    kept_entries.append(entry)
-            elif isinstance(entry, str) and _is_kedu_hook_command(entry):
-                changed = True
-            else:
-                kept_entries.append(entry)
-        if kept_entries:
-            hooks[event] = kept_entries
-        else:
-            hooks.pop(event, None)
-            changed = True
-    if not hooks:
-        settings.pop("hooks", None)
-    return changed
-
-
-def _remove_claude_settings_hook(path: Path, result: CleanupResult, *, dry_run: bool) -> None:
-    if not path.exists() or not path.is_file():
-        return
-    try:
-        settings = json.loads(path.read_text(encoding="utf-8") or "{}")
-    except json.JSONDecodeError:
-        result.warnings.append(f"skip invalid Claude settings JSON: {path}")
-        return
-    if not isinstance(settings, dict):
-        result.preserved.append({"path": str(path), "reason": "Claude settings are not a JSON object"})
-        return
-    if not _remove_kedu_claude_hooks(settings):
-        result.preserved.append({"path": str(path), "reason": "no Kedu Claude hook found"})
-        return
-    action = "remove_file" if not settings else "remove_claude_hook"
-    _add_action(result, action, path, "remove Claude SessionEnd Kedu hook", dry_run=dry_run)
-    if not dry_run:
-        if settings:
-            path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         else:
             path.unlink()
 
@@ -313,7 +233,7 @@ def cleanup_user_install(
         )
     else:
         _remove_dir(install_root, result, "remove installed Kedu engine", dry_run=dry_run)
-    for child in ("hooks", "adapters", "agents"):
+    for child in ("adapters", "agents", "logs"):
         _remove_dir(kedu_home / child, result, "remove installed Kedu support templates", dry_run=dry_run)
 
     launch_agents = Path.home() / "Library" / "LaunchAgents"
@@ -323,21 +243,19 @@ def cleanup_user_install(
 
     if "codex" in hosts:
         codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+        agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
         _remove_kedu_block(codex_home / "AGENTS.md", result, dry_run=dry_run)
-        _remove_dir(codex_home / "skills" / "kedu", result, "remove global Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(codex_home / "skills" / "kedu", result, "remove legacy global Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "kedu", result, "remove global Codex Kedu skill", dry_run=dry_run)
     if "claude" in hosts:
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
         _remove_kedu_block(claude_home / "CLAUDE.md", result, dry_run=dry_run)
-        _remove_claude_settings_hook(claude_home / "settings.json", result, dry_run=dry_run)
         _remove_dir(claude_home / "skills" / "kedu", result, "remove Claude Kedu skill", dry_run=dry_run)
         _remove_dir(claude_home / "skills" / "kedu-log", result, "remove Claude Kedu log skill", dry_run=dry_run)
         _remove_dir(claude_home / "skills" / "kedu-search", result, "remove Claude Kedu search skill", dry_run=dry_run)
-        _remove_file_if_contains(claude_home / "hooks" / "session_end_log.sh", "kedu", result, "remove Claude Kedu hook", dry_run=dry_run)
     if "kiro" in hosts:
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
         _remove_file_if_contains(kiro_home / "steering" / "kedu.md", "Kedu", result, "remove global Kiro Kedu steering", dry_run=dry_run)
-        _remove_file_if_contains(kiro_home / "hooks" / "kedu-clean-exit.kiro.hook", "Kedu", result, "remove global Kiro Kedu hook", dry_run=dry_run)
-        _remove_file_if_contains(kiro_home / "hooks" / "agentStop.sh", "kedu", result, "remove old global Kiro agentStop hook", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "agents" / "kedu.json", "Kedu", result, "remove global Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove global Kiro Kedu prompt", dry_run=dry_run)
     if "cursor" in hosts:
@@ -356,25 +274,21 @@ def cleanup_project_install(
     project_root: Path,
     project: str | None,
     hosts: tuple[str, ...],
-    archive_threshold_days: int,
     dry_run: bool,
-    now: datetime | None = None,
 ) -> None:
     resolved_project = _project_slug_from_config(project_root, project)
     kedu_paths = paths_mod.resolve_paths(project=resolved_project, cwd=project_root)
 
     if "codex" in hosts:
         _remove_kedu_block(project_root / "AGENTS.md", result, dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "kedu", result, "remove project Codex Kedu skill", dry_run=dry_run)
     if "claude" in hosts:
         _remove_kedu_block(project_root / "CLAUDE.md", result, dry_run=dry_run)
-        _remove_claude_settings_hook(project_root / ".claude" / "settings.local.json", result, dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu", result, "remove project Claude Kedu skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-log", result, "remove project Claude Kedu log skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-search", result, "remove project Claude Kedu search skill", dry_run=dry_run)
     if "kiro" in hosts:
         _remove_file_if_contains(project_root / ".kiro" / "steering" / "kedu.md", "Kedu", result, "remove project Kiro Kedu steering", dry_run=dry_run)
-        _remove_file_if_contains(project_root / ".kiro" / "hooks" / "kedu-clean-exit.kiro.hook", "Kedu", result, "remove project Kiro Kedu hook", dry_run=dry_run)
-        _remove_file_if_contains(project_root / ".kiro" / "hooks" / "agentStop.sh", "kedu", result, "remove old project Kiro agentStop hook", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "agents" / "kedu.json", "Kedu", result, "remove project Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove project Kiro Kedu prompt", dry_run=dry_run)
     if "cursor" in hosts:
@@ -444,6 +358,7 @@ def _looks_like_kedu_project(path: Path) -> bool:
             path / ".claude" / "skills" / "kedu" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-log" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-search" / "SKILL.md",
+            path / ".agents" / "skills" / "kedu" / "SKILL.md",
             path / ".cursor" / "rules" / "kedu.mdc",
         )
     )
@@ -483,14 +398,12 @@ def cleanup(
     project_root: str | Path | None,
     project: str | None = None,
     hosts: tuple[str, ...] = HOSTS,
-    archive_threshold_days: int = ARCHIVE_THRESHOLD_DAYS,
     bin_dir: str | Path | None = None,
     install_root: str | Path | None = None,
     scan_projects: bool = False,
     scan_roots: list[str | Path] | None = None,
     scan_depth: int = DEFAULT_SCAN_DEPTH,
     dry_run: bool = True,
-    now: datetime | None = None,
 ) -> CleanupResult:
     result = CleanupResult(dry_run=dry_run)
     kedu_home = paths_mod.kedu_home()
@@ -524,9 +437,7 @@ def cleanup(
             project_root=resolved_project_root,
             project=project,
             hosts=hosts,
-            archive_threshold_days=archive_threshold_days,
             dry_run=dry_run,
-            now=now,
         )
 
     if not user and project_root is None and not scan_projects:

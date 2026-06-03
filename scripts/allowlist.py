@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -20,12 +21,17 @@ class Allowlist:
         return any(pattern.search(value) for pattern in self.regexes)
 
 
+@lru_cache(maxsize=None)
+def _load_allowlist_cached(config_path: Path) -> tuple[frozenset[str], tuple[re.Pattern[str], ...]]:
+    if not config_path.exists():
+        return frozenset(), ()
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    exact = frozenset(data.get("exact", []))
+    regexes = tuple(re.compile(pattern) for pattern in data.get("regex", []))
+    return exact, regexes
+
+
 def load_allowlist(path: Path | None = None) -> Allowlist:
     config_path = path or DEFAULT_CONFIG
-    if not config_path.exists():
-        return Allowlist(exact=set(), regexes=[])
-    data = json.loads(config_path.read_text(encoding="utf-8"))
-    exact = set(data.get("exact", []))
-    regexes = [re.compile(pattern) for pattern in data.get("regex", [])]
-    return Allowlist(exact=exact, regexes=regexes)
-
+    exact, regexes = _load_allowlist_cached(config_path)
+    return Allowlist(exact=set(exact), regexes=list(regexes))

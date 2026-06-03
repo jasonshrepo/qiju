@@ -184,31 +184,6 @@ install_file() {
   log "installed: $dst"
 }
 
-append_block_if_missing() {
-  local block_file="$1"
-  local target_file="$2"
-  local marker="$3"
-  if [ -f "$target_file" ] && grep -q "$marker" "$target_file"; then
-    log "ok: $target_file already contains kedu block"
-    return 0
-  fi
-  if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] append $block_file -> $target_file"
-    return 0
-  fi
-  mkdir -p "$(dirname "$target_file")"
-  if [ -e "$target_file" ]; then
-    local backup
-    backup="$(backup_path "$target_file")"
-    cp "$target_file" "$backup"
-    log "backup: $target_file -> $backup"
-    printf '\n\n' >> "$target_file"
-  fi
-  cat "$block_file" >> "$target_file"
-  printf '\n' >> "$target_file"
-  log "updated: $target_file"
-}
-
 copy_project() {
   require_command tar
   log "Installing Kedu $VERSION"
@@ -259,14 +234,11 @@ EOF
 }
 
 install_shared_store() {
-  run mkdir -p "$KEDU_HOME/long" "$KEDU_HOME/archive" "$KEDU_HOME/hooks" "$KEDU_HOME/adapters" "$KEDU_HOME/agents" "$KEDU_HOME/logs"
-  install_file "$SOURCE_DIR/hooks/session_end_log.sh" "$KEDU_HOME/hooks/session_end_log.sh" 0755
+  run mkdir -p "$KEDU_HOME/long" "$KEDU_HOME/archive" "$KEDU_HOME/adapters" "$KEDU_HOME/agents" "$KEDU_HOME/logs"
   install_file "$SOURCE_DIR/adapters/claude_code.sh" "$KEDU_HOME/adapters/claude_code.sh" 0755
   install_file "$SOURCE_DIR/agents/claude/CLAUDE.kedu.md" "$KEDU_HOME/agents/claude-CLAUDE.kedu.md" 0644
   install_file "$SOURCE_DIR/skills/kedu/SKILL.md" "$KEDU_HOME/agents/claude-kedu-skill.md" 0644
-  install_file "$SOURCE_DIR/agents/codex/AGENTS.kedu.md" "$KEDU_HOME/agents/codex-AGENTS.kedu.md" 0644
   install_file "$SOURCE_DIR/agents/kiro/steering/kedu.md" "$KEDU_HOME/agents/kiro-kedu.md" 0644
-  install_file "$SOURCE_DIR/agents/kiro/hooks/kedu-clean-exit.kiro.hook" "$KEDU_HOME/agents/kiro-kedu-clean-exit.kiro.hook" 0644
   install_file "$SOURCE_DIR/agents/kiro/agents/kedu.json" "$KEDU_HOME/agents/kiro-kedu-agent.json" 0644
   install_file "$SOURCE_DIR/agents/kiro/prompts/kedu-agent-prompt.md" "$KEDU_HOME/agents/kiro-kedu-agent-prompt.md" 0644
   install_file "$SOURCE_DIR/agents/cursor/rules/kedu.mdc" "$KEDU_HOME/agents/cursor-kedu.mdc" 0644
@@ -394,7 +366,7 @@ install_claude() {
       (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host claude >/dev/null)
     fi
   fi
-  log "Claude SessionEnd hook registered through Kedu init"
+  log "Claude integration registered through Kedu init"
 }
 
 install_kiro() {
@@ -410,13 +382,21 @@ install_kiro() {
 install_codex() {
   [ -n "$PROJECT_DIR" ] || die "Codex integration requires --project"
   log "Installing Codex integration for project: $PROJECT_DIR"
-  append_block_if_missing "$SOURCE_DIR/agents/codex/AGENTS.kedu.md" "$PROJECT_DIR/AGENTS.md" "kedu:start"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "[dry-run] cd $PROJECT_DIR && kedu init --host codex"
+  else
+    (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host codex >/dev/null)
+  fi
 }
 
 install_cursor() {
   [ -n "$PROJECT_DIR" ] || die "Cursor integration requires --project"
   log "Installing Cursor integration for project: $PROJECT_DIR"
-  install_file "$SOURCE_DIR/agents/cursor/rules/kedu.mdc" "$PROJECT_DIR/.cursor/rules/kedu.mdc" 0644
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "[dry-run] cd $PROJECT_DIR && kedu init --host cursor"
+  else
+    (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host cursor >/dev/null)
+  fi
 }
 
 print_status() {

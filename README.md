@@ -64,9 +64,9 @@ kedu init --host claude --place global
 
 Project-local integrations write:
 
-- Claude: appends a line-counted Kedu block to `CLAUDE.md`, registers a `SessionEnd` hook in `.claude/settings.local.json`, and writes the unified `/kedu` skill under `.claude/skills/kedu/`
+- Claude: appends a line-counted Kedu block to `CLAUDE.md` and writes the unified `/kedu` skill under `.claude/skills/kedu/`
 - Codex: appends a Kedu block to `AGENTS.md`
-- Kiro: writes `.kiro/steering/kedu.md`, `.kiro/hooks/kedu-clean-exit.kiro.hook`, `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
+- Kiro: writes `.kiro/steering/kedu.md`, `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
 - Cursor: writes `.cursor/rules/kedu.mdc`
 
 Claude `CLAUDE.md` sections are wrapped as:
@@ -100,9 +100,8 @@ or make it the CLI default yourself:
 kiro-cli agent set-default kedu
 ```
 
-Kiro CLI does not reliably fire the Kiro `agentStop` hook when a CLI session quits. Log
-explicitly before quitting. Kiro IDE can use the generated hook, but temporary entry JSON
-should be written inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
+Kiro does not use automatic Kedu hooks. Log explicitly before ending work, and write
+temporary entry JSON inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
 
 Each local init also creates:
 
@@ -127,6 +126,23 @@ The record body is validated, redacted, then appended to:
 - `$KEDU_HOME/long/<project>.jsonl`
 
 `--body` expects a path to a JSON file. If omitted, `kedu log` reads JSON from stdin.
+
+### Where records anchor
+
+`kedu log` resolves the project root — and therefore where `.kedu/short.jsonl` lands and
+which `<project>.jsonl` the long tier uses — by this precedence:
+
+1. `KEDU_PROJECT_ROOT` environment variable, if set.
+2. The nearest ancestor directory containing the `.kedu/config.json` marker written by
+   `kedu init`. This keeps records anchored to the project root even when an agent runs
+   `kedu log` from a subdirectory.
+3. The git repository root (`git rev-parse --show-toplevel`).
+4. The current working directory, as a last resort.
+
+The project slug is read from the init marker when present, so it stays stable across
+directory renames. If none of the above identifies a root (an uninitialized, non-git
+directory) and no `--project` is given, `kedu log` stops rather than create a stray
+project identity — run `kedu init` first, pass `--project`, or set `KEDU_PROJECT_ROOT`.
 
 ## Search
 
@@ -188,8 +204,7 @@ kedu uninstall --dry-run --scan-root /path/to/projects
 ```
 
 For Claude, uninstall removes only the marked Kedu block from `CLAUDE.md` and removes
-the nested Kedu `SessionEnd` hook from Claude settings, leaving unrelated instructions
-and settings intact.
+the Kedu skill, leaving unrelated instructions intact.
 
 Uninstall never removes shared record or audit data under `~/.kedu/long`,
 `~/.kedu/archive`, `~/.kedu/query_log.jsonl`, or `~/.kedu/redaction_log.jsonl`. In

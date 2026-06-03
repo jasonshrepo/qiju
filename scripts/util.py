@@ -60,6 +60,21 @@ def write_jsonl_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
             tmp_path.unlink()
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            tmp_path.unlink()
+
+
 @contextlib.contextmanager
 def exclusive_lock(lock_path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,9 +102,13 @@ def parse_iso(ts: str):
     from datetime import datetime
 
     normalized = ts.replace("Z", "+00:00")
-    return datetime.fromisoformat(normalized)
+    parsed = datetime.fromisoformat(normalized)
+    # Stored timestamps are tz-aware; a bare date/datetime bound (e.g. `--since 2026-06-02`)
+    # parses naive. Attach the local zone so range comparisons never mix naive and aware.
+    if parsed.tzinfo is None:
+        parsed = parsed.astimezone()
+    return parsed
 
 
 def jsonable_copy(value: Any) -> Any:
     return json.loads(json.dumps(value, ensure_ascii=False))
-

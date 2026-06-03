@@ -122,21 +122,44 @@ def cmd_maintain(args: argparse.Namespace) -> int:
         return 1
 
 
+def _print_uninstall_result(result: cleanup_mod.CleanupResult) -> None:
+    label = "dry-run" if result.dry_run else "uninstall"
+    print(f"kedu {label}")
+    print()
+    if result.actions:
+        print("Removed:")
+        for action in result.actions:
+            if action.executed or result.dry_run:
+                verb = {"remove_file": "file", "remove_dir": "dir", "remove_kedu_block": "block"}.get(action.action, action.action)
+                print(f"  [{verb}] {action.path}")
+    else:
+        print("  (nothing to remove)")
+    if result.preserved:
+        print()
+        print("Preserved:")
+        for item in result.preserved:
+            print(f"  {item['path']}")
+            print(f"    reason: {item['reason']}")
+    if result.warnings:
+        print()
+        print("Warnings:")
+        for warning in result.warnings:
+            print(f"  {warning}")
+    print()
+    removed = sum(1 for a in result.actions if a.executed or result.dry_run)
+    print(f"Summary: {removed} removed, {len(result.preserved)} preserved")
+
+
 def cmd_uninstall(args: argparse.Namespace) -> int:
     try:
         user = not args.project_only
         project_root = None if args.user_only else (args.project_root or ".")
         scan_projects = bool(args.scan_projects)
-        if not args.user_only and not args.project_only and args.project_root is None and not args.no_project_scan:
-            scan_projects = True
-        if args.user_only or args.no_project_scan:
-            scan_projects = False
         result = cleanup_mod.cleanup(
             user=user,
             project_root=project_root,
             project=args.project,
             hosts=cleanup_mod.parse_hosts(args.hosts),
-            archive_threshold_days=args.archive_threshold_days,
             bin_dir=args.bin_dir,
             install_root=args.install_root,
             scan_projects=scan_projects,
@@ -144,7 +167,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
             scan_depth=args.scan_depth,
             dry_run=args.dry_run,
         )
-        _print_json(result.as_dict())
+        _print_uninstall_result(result)
         return 0
     except Exception as exc:
         print(f"kedu uninstall: {exc}", file=sys.stderr)
@@ -236,11 +259,9 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall_parser.add_argument("--project-root", "--project-path", dest="project_root", help="Project root to clean; defaults to the current directory")
     uninstall_parser.add_argument("--project", help="Project slug override")
     uninstall_parser.add_argument("--hosts", default="all", help="all or comma list: claude,kiro,codex,cursor")
-    uninstall_parser.add_argument("--scan-projects", action="store_true", help="Scan common project roots for Kedu-enabled projects")
-    uninstall_parser.add_argument("--no-project-scan", action="store_true", help="Do not scan project roots during unscoped uninstall")
+    uninstall_parser.add_argument("--scan-projects", action="store_true", help="Also scan common project roots and clean all discovered Kedu-enabled projects")
     uninstall_parser.add_argument("--scan-root", action="append", help="Root to scan for Kedu-enabled projects; can be repeated")
     uninstall_parser.add_argument("--scan-depth", type=int, default=cleanup_mod.DEFAULT_SCAN_DEPTH, help="Maximum scan depth for project discovery")
-    uninstall_parser.add_argument("--archive-threshold-days", type=int, default=cleanup_mod.ARCHIVE_THRESHOLD_DAYS)
     uninstall_parser.add_argument("--bin-dir", help="Kedu shim directory, default: ~/.local/bin")
     uninstall_parser.add_argument("--install-root", help="Installed Kedu engine path, default: ~/.kedu/kedu")
     uninstall_parser.set_defaults(func=cmd_uninstall)

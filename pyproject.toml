@@ -4,6 +4,16 @@ version = "0.1.0"
 description = "Local-first, lossless session records for AI coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Jason Shen" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+]
 dependencies = [
     "duckdb==1.5.3",
 ]
@@ -14,6 +24,15 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 kedu = "scripts.kedu:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.setuptools]
 packages = ["scripts"]

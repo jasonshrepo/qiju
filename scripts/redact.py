@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -24,25 +26,32 @@ class RedactionRule:
     placeholder: str
 
 
-def load_rules(path: Path | None = None) -> list[RedactionRule]:
-    config_path = path or RULES_PATH
+@lru_cache(maxsize=None)
+def _load_rules_cached(config_path: Path) -> tuple[RedactionRule, ...]:
     data = json.loads(config_path.read_text(encoding="utf-8"))
     rules: list[RedactionRule] = []
     for item in data:
         rules.append(
             RedactionRule(
                 type=item["type"],
+                # JSON strings cannot embed inline regex flags; [\s\S] matches any char
+                # including newlines as a portable alternative to re.DOTALL.
                 pattern=re.compile(item["pattern"]),
                 placeholder=item["placeholder"],
             )
         )
-    return rules
+    return tuple(rules)
+
+
+def load_rules(path: Path | None = None) -> list[RedactionRule]:
+    config_path = path or RULES_PATH
+    return list(_load_rules_cached(config_path))
 
 
 def shannon_entropy(value: str) -> float:
     if not value:
         return 0.0
-    counts = {char: value.count(char) for char in set(value)}
+    counts = Counter(value)
     length = len(value)
     return -sum((count / length) * math.log2(count / length) for count in counts.values())
 
@@ -56,20 +65,20 @@ def _redact_string(
     redactions: list[dict[str, Any]] = []
 
     for rule in rules:
-        def replace(match: re.Match[str]) -> str:
+        def replace(match: re.Match[str], _rule: RedactionRule = rule) -> str:
             text = match.group(0)
             if allowlist.matches(text):
                 return text
             redactions.append(
                 {
                     "field": field,
-                    "type": rule.type,
+                    "type": _rule.type,
                     "start": match.start(),
                     "end": match.end(),
-                    "placeholder": rule.placeholder,
+                    "placeholder": _rule.placeholder,
                 }
             )
-            return rule.placeholder
+            return _rule.placeholder
 
         value = rule.pattern.sub(replace, value)
 
@@ -102,20 +111,19 @@ def redact_value(
 ) -> tuple[Any, list[dict[str, Any]]]:
     rules = rules if rules is not None else load_rules()
     allowlist = allowlist if allowlist is not None else allowlist_mod.load_allowlist()
+    redactions: list[dict[str, Any]] = []
 
     if isinstance(value, str):
         return _redact_string(value, field, rules, allowlist)
     if isinstance(value, list):
         result = []
-        redactions: list[dict[str, Any]] = []
         for index, item in enumerate(value):
             redacted, item_redactions = redact_value(item, f"{field}[{index}]", rules, allowlist)
             result.append(redacted)
             redactions.extend(item_redactions)
         return result, redactions
     if isinstance(value, dict):
-        result: dict[str, Any] = {}
-        redactions: list[dict[str, Any]] = []
+        result = {}
         for key, item in value.items():
             redacted, item_redactions = redact_value(item, f"{field}.{key}", rules, allowlist)
             result[key] = redacted

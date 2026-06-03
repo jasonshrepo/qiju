@@ -9,8 +9,22 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .block_format import (
+        CLAUDE_BLOCK_START,
+        CLAUDE_BLOCK_STOP_PREFIX,
+        KEDU_BLOCK_END,
+        KEDU_BLOCK_START,
+        find_line_marked_block,
+    )
     from . import paths as paths_mod, util
 except ImportError:  # pragma: no cover
+    from block_format import (  # type: ignore
+        CLAUDE_BLOCK_START,
+        CLAUDE_BLOCK_STOP_PREFIX,
+        KEDU_BLOCK_END,
+        KEDU_BLOCK_START,
+        find_line_marked_block,
+    )
     import paths as paths_mod  # type: ignore
     import util  # type: ignore
 
@@ -19,10 +33,6 @@ INIT_SCHEMA_VERSION = 1
 KNOWN_AGENTS = ("claude", "kiro", "codex", "cursor")
 
 KEDU_MARKER = "kedu:start"
-KEDU_BLOCK_START = "<!-- kedu:start -->"
-KEDU_BLOCK_END = "<!-- kedu:end -->"
-CLAUDE_BLOCK_START = "====kedu start ===="
-CLAUDE_BLOCK_STOP_PREFIX = "====kedu stop line:"
 CLAUDE_BLOCK_STOP_SUFFIX = "===="
 
 KEDU_PRIORITY = """Kedu records are verified session handoff records and project history.
@@ -130,9 +140,9 @@ If `kedu` is not available in the agent shell, use the installed full path:
 ~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
 ```
 
-Kiro CLI does not reliably fire the `agentStop` hook when the CLI session quits. In Kiro
-CLI, log explicitly before quitting. Kiro IDE may reject writes outside the workspace;
-write temporary entry JSON to `.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.
+Kiro does not use automatic Kedu hooks. Log explicitly before ending work. Kiro may
+reject writes outside the workspace; write temporary entry JSON to
+`.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.
 
 For Kiro Specs and planned requirements, follow spec files. If Kiro Specs and Kedu
 records conflict, inspect both: spec = intended plan; Kedu = historical evidence. Then
@@ -293,6 +303,7 @@ All agents share `~/.kedu`; there are no per-agent Kedu stores. The record `agen
 records who wrote it. The record `source` field records how it was captured.
 """
 
+
 class AgentDetectionError(ValueError):
     pass
 
@@ -391,10 +402,6 @@ def _write_file(path: Path, content: str) -> bool:
     return True
 
 
-def _source_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
 def _kedu_cli_command() -> str:
     home = paths_mod.kedu_home()
     install_root = Path(os.environ.get("KEDU_INSTALL_ROOT", home / "kedu")).expanduser()
@@ -409,9 +416,8 @@ def _kiro_agent_prompt() -> str:
 
 ## Kiro CLI Operation
 
-Kiro CLI does not reliably fire the `agentStop` hook when the CLI session quits. Do not
-promise automatic exit capture in Kiro CLI. Before quitting, explicitly save durable
-work with:
+Kiro does not use automatic Kedu hooks. Do not promise automatic exit capture. Before
+quitting or when asked to save progress, explicitly save durable work with:
 
 ```bash
 {command} log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
@@ -420,34 +426,10 @@ work with:
 Agent shells may not inherit the interactive `kedu` alias or PATH. If `kedu` is not
 available, use the full command path above.
 
-For Kiro IDE hooks, write the temporary entry file inside the workspace, for example
-`.kedu/kedu-entry.json`, because the IDE may reject writes to `/tmp`. Remove that temp
-entry file after a successful log.
+Write the temporary entry file inside the workspace, for example
+`.kedu/kedu-entry.json`, because Kiro may reject writes to `/tmp`. Remove that temp entry
+file after a successful log.
 """
-
-
-def _kiro_hook() -> str:
-    prompt = (
-        "If this IDE session contains durable implementation, review, or decision context, "
-        "summarize it into a structured Kedu record. Write the JSON entry file inside the "
-        "workspace, for example .kedu/kedu-entry.json, then run:\n\n"
-        f"  {_kedu_cli_command()} log --source clean_exit --agent kiro --project <project> --body .kedu/kedu-entry.json\n\n"
-        "Include title, tags, search_terms, next_steps, and body_md. Do not include secrets. "
-        "Remember: --body is a path to a JSON file, not inline JSON. Remove the temporary "
-        ".kedu/kedu-entry.json file after a successful log. Kiro CLI may not fire this hook; "
-        "CLI sessions must log explicitly before quitting."
-    )
-    return json.dumps(
-        {
-            "name": "Kedu Clean Exit",
-            "version": "1.0.0",
-            "description": "Capture durable Kedu session records after Kiro IDE finishes a turn.",
-            "when": {"type": "agentStop"},
-            "then": {"type": "askAgent", "prompt": prompt},
-        },
-        ensure_ascii=False,
-        indent=2,
-    ) + "\n"
 
 
 def _kiro_agent_config() -> str:
@@ -484,19 +466,6 @@ def _kiro_agent_config() -> str:
     ) + "\n"
 
 
-def _install_claude_hook_script() -> Path:
-    source = _source_root() / "hooks" / "session_end_log.sh"
-    target = paths_mod.kedu_home() / "hooks" / "session_end_log.sh"
-    if source.exists():
-        _write_file(target, source.read_text(encoding="utf-8"))
-        target.chmod(0o755)
-    return target
-
-
-def _claude_hook_command() -> str:
-    return shlex.quote(str(paths_mod.kedu_home() / "hooks" / "session_end_log.sh"))
-
-
 def _line_marked_block(block: str) -> str:
     body = block.strip("\n")
     lines = body.splitlines()
@@ -504,25 +473,12 @@ def _line_marked_block(block: str) -> str:
     return "\n".join([CLAUDE_BLOCK_START, *lines, stop, ""])
 
 
-def _find_claude_marked_block(content: str) -> tuple[int, int] | None:
-    lines = content.splitlines(keepends=True)
-    offset = 0
-    start_offset: int | None = None
-    for line in lines:
-        if line.strip() == CLAUDE_BLOCK_START:
-            start_offset = offset
-        elif start_offset is not None and line.strip().startswith(CLAUDE_BLOCK_STOP_PREFIX):
-            return start_offset, offset + len(line)
-        offset += len(line)
-    return None
-
-
 def _append_claude_block(path: Path, block: str) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     block_text = _line_marked_block(block)
     if path.exists():
         current = path.read_text(encoding="utf-8")
-        marked = _find_claude_marked_block(current)
+        marked = find_line_marked_block(current)
         if marked:
             start, end = marked
             parts = [part for part in (current[:start].rstrip(), block_text.rstrip(), current[end:].lstrip()) if part]
@@ -531,7 +487,7 @@ def _append_claude_block(path: Path, block: str) -> bool:
             start = current.find(KEDU_BLOCK_START)
             end = current.find(KEDU_BLOCK_END)
             if start == -1 or end == -1 or end < start:
-                return False
+                raise ValueError(f"malformed Kedu block in {path}: missing or misordered legacy delimiters")
             end += len(KEDU_BLOCK_END)
             parts = [part for part in (current[:start].rstrip(), block_text.rstrip(), current[end:].lstrip()) if part]
             updated = "\n\n".join(parts) + "\n"
@@ -555,7 +511,7 @@ def _append_block(path: Path, block: str) -> bool:
             start = current.find(KEDU_BLOCK_START)
             end = current.find(KEDU_BLOCK_END)
             if start == -1 or end == -1 or end < start:
-                return False
+                raise ValueError(f"malformed Kedu block in {path}: missing or misordered legacy delimiters")
             end += len(KEDU_BLOCK_END)
             parts = [part for part in (current[:start].rstrip(), block.rstrip(), current[end:].lstrip()) if part]
             updated = "\n\n".join(parts) + "\n"
@@ -573,98 +529,10 @@ def _append_block(path: Path, block: str) -> bool:
     return True
 
 
-def _load_json_object(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    text = path.read_text(encoding="utf-8").strip()
-    if not text:
-        return {}
-    loaded = json.loads(text)
-    if not isinstance(loaded, dict):
-        raise ValueError(f"expected JSON object in {path}")
-    return loaded
-
-
-def _is_kedu_hook_command(command: Any) -> bool:
-    if not isinstance(command, str):
-        return False
-    lowered = command.lower()
-    return "kedu" in lowered and ("session_end_log.sh" in lowered or "scripts/kedu.py" in lowered)
-
-
-def _remove_kedu_claude_hooks(settings: dict[str, Any]) -> bool:
-    hooks = settings.get("hooks")
-    if not isinstance(hooks, dict):
-        return False
-
-    changed = False
-    for event in list(hooks):
-        entries = hooks.get(event)
-        if not isinstance(entries, list):
-            continue
-        kept_entries: list[Any] = []
-        for entry in entries:
-            if isinstance(entry, dict):
-                nested_hooks = entry.get("hooks")
-                if isinstance(nested_hooks, list):
-                    kept_hooks = []
-                    for hook in nested_hooks:
-                        command = hook.get("command") if isinstance(hook, dict) else None
-                        if _is_kedu_hook_command(command):
-                            changed = True
-                        else:
-                            kept_hooks.append(hook)
-                    if kept_hooks:
-                        updated_entry = dict(entry)
-                        updated_entry["hooks"] = kept_hooks
-                        kept_entries.append(updated_entry)
-                    else:
-                        changed = True
-                elif _is_kedu_hook_command(entry.get("command")):
-                    changed = True
-                else:
-                    kept_entries.append(entry)
-            elif isinstance(entry, str) and _is_kedu_hook_command(entry):
-                changed = True
-            else:
-                kept_entries.append(entry)
-        if kept_entries:
-            hooks[event] = kept_entries
-        else:
-            hooks.pop(event, None)
-            changed = True
-
-    if not hooks:
-        settings.pop("hooks", None)
-    return changed
-
-
-def _install_claude_session_end_hook(settings_path: Path) -> bool:
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings = _load_json_object(settings_path)
-    original = json.dumps(settings, ensure_ascii=False, sort_keys=True)
-    _remove_kedu_claude_hooks(settings)
-    hooks = settings.setdefault("hooks", {})
-    if not isinstance(hooks, dict):
-        raise ValueError(f"settings hooks must be an object in {settings_path}")
-    session_end = hooks.setdefault("SessionEnd", [])
-    if not isinstance(session_end, list):
-        raise ValueError(f"settings hooks.SessionEnd must be a list in {settings_path}")
-    hook = {"type": "command", "command": _claude_hook_command()}
-    session_end.append({"matcher": "", "hooks": [hook]})
-    updated = json.dumps(settings, ensure_ascii=False, sort_keys=True)
-    if updated == original and settings_path.exists():
-        return False
-    if settings_path.exists():
-        shutil.copy2(settings_path, settings_path.with_name(f"{settings_path.name}.bak.{_timestamp()}"))
-    settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return True
-
-
 def ensure_kedu_home() -> list[str]:
     home = paths_mod.kedu_home()
     files: list[str] = []
-    for directory in ("long", "archive", "hooks", "adapters", "agents"):
+    for directory in ("long", "archive", "adapters", "agents"):
         path = home / directory
         path.mkdir(parents=True, exist_ok=True)
         files.append(str(path))
@@ -678,38 +546,28 @@ def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
 
     if agent == "claude":
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
-        hook_script = _install_claude_hook_script()
-        settings_path = claude_home / "settings.json"
         targets = {
             claude_home / "CLAUDE.md": CLAUDE_BLOCK,
             claude_home / "skills" / "kedu" / "SKILL.md": KEDU_CLAUDE_SKILL,
             home / "agents" / "claude-CLAUDE.kedu.md": CLAUDE_BLOCK,
             home / "agents" / "claude-kedu-skill.md": KEDU_CLAUDE_SKILL,
         }
-        files.append(str(hook_script))
-        _install_claude_session_end_hook(settings_path)
-        files.append(str(settings_path))
     elif agent == "kiro":
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
         kiro_agent_prompt = _kiro_agent_prompt()
         kiro_agent_config = _kiro_agent_config()
-        kiro_hook = _kiro_hook()
         targets = {
             kiro_home / "steering" / "kedu.md": KIRO_STEERING,
-            kiro_home / "hooks" / "kedu-clean-exit.kiro.hook": kiro_hook,
             kiro_home / "agents" / "kedu.json": kiro_agent_config,
             kiro_home / "prompts" / "kedu-agent-prompt.md": kiro_agent_prompt,
             home / "agents" / "kiro-kedu.md": KIRO_STEERING,
-            home / "agents" / "kiro-kedu-clean-exit.kiro.hook": kiro_hook,
             home / "agents" / "kiro-kedu-agent.json": kiro_agent_config,
             home / "agents" / "kiro-kedu-agent-prompt.md": kiro_agent_prompt,
         }
     elif agent == "codex":
-        codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+        agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
         targets = {
-            codex_home / "AGENTS.md": CODEX_BLOCK,
-            codex_home / "skills" / "kedu" / "SKILL.md": CODEX_KEDU_SKILL,
-            home / "agents" / "codex-AGENTS.kedu.md": CODEX_BLOCK,
+            agent_home / ".agents" / "skills" / "kedu" / "SKILL.md": CODEX_KEDU_SKILL,
             home / "agents" / "codex-kedu-skill.md": CODEX_KEDU_SKILL,
         }
     elif agent == "cursor":
@@ -815,26 +673,21 @@ def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path 
     if agent == "claude":
         target = kedu_paths.project_root / "CLAUDE.md"
         _append_claude_block(target, CLAUDE_BLOCK)
-        hook_script = _install_claude_hook_script()
-        settings = kedu_paths.project_root / ".claude" / "settings.local.json"
-        _install_claude_session_end_hook(settings)
         skill = kedu_paths.project_root / ".claude" / "skills" / "kedu" / "SKILL.md"
         _write_file(skill, KEDU_CLAUDE_SKILL)
-        files.extend([str(target), str(settings), str(hook_script), str(skill)])
+        files.extend([str(target), str(skill)])
     elif agent == "kiro":
         steering = kedu_paths.project_root / ".kiro" / "steering" / "kedu.md"
-        hook = kedu_paths.project_root / ".kiro" / "hooks" / "kedu-clean-exit.kiro.hook"
         cli_agent = kedu_paths.project_root / ".kiro" / "agents" / "kedu.json"
         prompt = kedu_paths.project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md"
         _write_file(steering, KIRO_STEERING)
-        _write_file(hook, _kiro_hook())
         _write_file(cli_agent, _kiro_agent_config())
         _write_file(prompt, _kiro_agent_prompt())
-        files.extend([str(steering), str(hook), str(cli_agent), str(prompt)])
+        files.extend([str(steering), str(cli_agent), str(prompt)])
     elif agent == "codex":
-        target = kedu_paths.project_root / "AGENTS.md"
-        _append_block(target, CODEX_BLOCK)
-        files.append(str(target))
+        skill = kedu_paths.project_root / ".agents" / "skills" / "kedu" / "SKILL.md"
+        _write_file(skill, CODEX_KEDU_SKILL)
+        files.append(str(skill))
     elif agent == "cursor":
         target = kedu_paths.project_root / ".cursor" / "rules" / "kedu.mdc"
         _write_file(target, CURSOR_RULE)

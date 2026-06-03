@@ -30,9 +30,9 @@ If `kedu` is not available in the agent shell, use the installed full path:
 ~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
 ```
 
-Kiro CLI does not reliably fire the `agentStop` hook when the CLI session quits. In Kiro
-CLI, log explicitly before quitting. Kiro IDE may reject writes outside the workspace;
-write temporary entry JSON to `.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.
+Kiro does not use automatic Kedu hooks. Log explicitly before ending work. Kiro may
+reject writes outside the workspace; write temporary entry JSON to
+`.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.
 
 For Kiro Specs and planned requirements, follow spec files. If Kiro Specs and Kedu
 records conflict, inspect both: spec = intended plan; Kedu = historical evidence. Then
