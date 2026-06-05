@@ -14,6 +14,7 @@ you own. Any agent — Claude Code, Codex, Kiro, Cursor, or whatever comes next 
 where the last one left off, instead of relying on memory that's locked inside one tool.
 
 <p>
+  <a href="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml"><img src="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-17313C.svg" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-216C83.svg" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-475A60.svg" alt="Platform: macOS | Linux">

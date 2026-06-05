@@ -21,14 +21,24 @@ except ImportError:  # pragma: no cover
 
 def read_entry(body_path: str | None = None, stdin_text: str | None = None) -> dict[str, Any]:
     if body_path:
-        text = Path(body_path).read_text(encoding="utf-8")
+        try:
+            text = Path(body_path).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raise ValueError(f"body file not found: {body_path}") from None
+        if not text.strip():
+            raise ValueError(f"body file is empty: {body_path}")
+        source = f"body file {body_path}"
     else:
         text = stdin_text if stdin_text is not None else sys.stdin.read()
-    if not text.strip():
-        raise ValueError("kedu log requires a JSON record via --body or stdin")
-    value = json.loads(text)
+        if not text.strip():
+            raise ValueError("requires a JSON record via --body or stdin")
+        source = "stdin"
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{source} is not valid JSON: {exc}") from None
     if not isinstance(value, dict):
-        raise ValueError("entry JSON must be an object")
+        raise ValueError(f"{source} must contain a JSON object")
     return value
 
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from threading import Barrier
+
+import pytest
 
 from scripts import archive, capture, maintain, paths, util
 from tests.conftest import sample_entry
@@ -142,3 +145,41 @@ def test_concurrent_same_session_logs_get_distinct_generated_ids(kedu_env, monke
 
     assert sorted(ids) == ["thread-session:1", "thread-session:2"]
     assert sorted(entry["id"] for entry in long_entries) == ["thread-session:1", "thread-session:2"]
+
+
+def test_read_entry_missing_body_file(tmp_path):
+    missing = tmp_path / "nope.json"
+    with pytest.raises(ValueError, match=f"body file not found: {missing}"):
+        capture.read_entry(str(missing))
+
+
+def test_read_entry_empty_body_file(tmp_path):
+    empty = tmp_path / "empty.json"
+    empty.write_text("   \n", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"body file is empty: {empty}"):
+        capture.read_entry(str(empty))
+
+
+def test_read_entry_invalid_json_body_file(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"body file {bad} is not valid JSON"):
+        capture.read_entry(str(bad))
+
+
+def test_read_entry_non_object_body_file(tmp_path):
+    arr = tmp_path / "arr.json"
+    arr.write_text("[1, 2, 3]", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"body file {arr} must contain a JSON object"):
+        capture.read_entry(str(arr))
+
+
+def test_read_entry_empty_stdin_keeps_generic_message():
+    with pytest.raises(ValueError, match="requires a JSON record via --body or stdin"):
+        capture.read_entry(stdin_text="")
+
+
+def test_read_entry_valid_body_file_returns_dict(tmp_path):
+    good = tmp_path / "ok.json"
+    good.write_text(json.dumps({"title": "hi"}), encoding="utf-8")
+    assert capture.read_entry(str(good)) == {"title": "hi"}
