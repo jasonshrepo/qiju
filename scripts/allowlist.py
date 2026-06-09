@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
-DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "config" / "allowlist.json"
+DEFAULT_CONFIG = Path(__file__).resolve().parent / "config" / "allowlist.json"
 
 
 @dataclass

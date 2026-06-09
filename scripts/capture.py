@@ -7,14 +7,13 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import id_gen, paths as paths_mod, redact, schema, state, util
+    from . import id_gen, paths as paths_mod, redact, schema, util
     from .storage import id_locations
 except ImportError:  # pragma: no cover
     import id_gen  # type: ignore
     import paths as paths_mod  # type: ignore
     import redact  # type: ignore
     import schema  # type: ignore
-    import state  # type: ignore
     import util  # type: ignore
     from storage import id_locations  # type: ignore
 
@@ -55,8 +54,9 @@ def prepare_entry(
     entry["source"] = source
     entry["project"] = project
     entry["agent"] = agent or os.environ.get("KEDU_AGENT") or entry.get("agent") or "unknown"
-    entry.setdefault("ts", util.utcish_now_iso())
-    if not entry.get("ts"):
+    # Kedu is lossless: a missing OR malformed ts must not fail or drop the log.
+    # Coerce anything unparseable to "now" so the persisted entry always has a valid ts.
+    if util.try_parse_iso(entry.get("ts")) is None:
         entry["ts"] = util.utcish_now_iso()
     if entry_id:
         entry["id"] = entry_id
@@ -78,7 +78,6 @@ def log_entry(
     agent: str | None = None,
     cwd: str | Path | None = None,
     session_id: str | None = None,
-    rebuild_state: bool = True,
 ) -> str:
     kedu_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
     # Refuse to mint a new project identity from a wandered cwd. This fires only when the
@@ -118,8 +117,5 @@ def log_entry(
             util.append_jsonl(kedu_paths.short_jsonl, entry)
         if "long" not in locations:
             util.append_jsonl(kedu_paths.long_jsonl, entry)
-
-    if rebuild_state:
-        state.rebuild_state(project=kedu_paths.project, cwd=kedu_paths.project_root)
 
     return entry_id

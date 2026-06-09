@@ -37,7 +37,8 @@ def test_capture_redacts_before_write(kedu_env):
     )
     kedu_paths = paths.resolve_paths(project="repo", cwd=kedu_env["project"])
     written = util.read_jsonl(kedu_paths.long_jsonl)[0]
-    assert written["body_md"] == "[REDACTED:aws_access_key]"
+    assert written["body_md"].startswith("[REDACTED:pii:")
+    assert "AKIAIOSFODNN7EXAMPLE" not in written["body_md"]
     assert written["redactions"]
 
 
@@ -183,3 +184,17 @@ def test_read_entry_valid_body_file_returns_dict(tmp_path):
     good = tmp_path / "ok.json"
     good.write_text(json.dumps({"title": "hi"}), encoding="utf-8")
     assert capture.read_entry(str(good)) == {"title": "hi"}
+
+
+def test_log_coerces_malformed_ts_losslessly(kedu_env):
+    # Kedu is lossless: a bad ts must not fail the log; it is coerced to a parseable value.
+    entry_id = capture.log_entry(
+        sample_entry(ts="not-a-date"),
+        source="manual",
+        project="repo",
+        cwd=kedu_env["project"],
+    )
+    kedu_paths = paths.resolve_paths(project="repo", cwd=kedu_env["project"])
+    written = util.read_jsonl(kedu_paths.long_jsonl)
+    assert len(written) == 1
+    assert util.try_parse_iso(written[0]["ts"]) is not None

@@ -107,10 +107,6 @@ class KeduPaths:
         return self.project_kedu_dir / "short.jsonl"
 
     @property
-    def state_md(self) -> Path:
-        return self.project_kedu_dir / "STATE.md"
-
-    @property
     def long_dir(self) -> Path:
         return self.home / "long"
 
@@ -121,10 +117,6 @@ class KeduPaths:
     @property
     def archive_dir(self) -> Path:
         return self.home / "archive"
-
-    @property
-    def query_log(self) -> Path:
-        return self.home / "query_log.jsonl"
 
     @property
     def redaction_log(self) -> Path:

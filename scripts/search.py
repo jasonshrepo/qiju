@@ -6,10 +6,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import paths as paths_mod, query_log, storage, util
+    from . import paths as paths_mod, storage, util
 except ImportError:  # pragma: no cover
     import paths as paths_mod  # type: ignore
-    import query_log  # type: ignore
     import storage  # type: ignore
     import util  # type: ignore
 
@@ -60,7 +59,11 @@ def _contains_tag(entry: dict[str, Any], tags: list[str]) -> bool:
 def _in_time_range(entry: dict[str, Any], since: str | None, until: str | None) -> bool:
     if not since and not until:
         return True
-    ts = util.parse_iso(str(entry.get("ts")))
+    # A time filter is active: an entry with an unparseable ts can't satisfy a range
+    # bound, so exclude it (rather than crashing). The CLI bounds stay strict via parse_iso.
+    ts = util.try_parse_iso(entry.get("ts"))
+    if ts is None:
+        return False
     if since and ts < util.parse_iso(since):
         return False
     if until and ts > util.parse_iso(until):
@@ -84,7 +87,6 @@ def search_entries(
     regex: bool = False,
     sort: str = "ts",
     order: str = "desc",
-    log: bool = True,
 ) -> list[dict[str, Any]]:
     projects = _resolve_scope(scope, project, cwd)
     tags = tags or []
@@ -120,24 +122,44 @@ def search_entries(
         if limit is not None and len(results) >= limit:
             break
 
-    if log:
-        query_log.log_query(
-            scope=scope,
-            project_filter=projects,
-            query=query,
-            filters={"tags": tags, "since": since, "until": until, "source": source, "agent": agent, "limit": limit},
-            result_count=len(results),
-        )
     return results
 
 
 def show_entry(entry_id: str, *, project: str | None = None, cwd: str | Path | None = None) -> dict[str, Any] | None:
     scope = "all" if project is None else "current_project"
-    entries = search_entries(scope=scope, project=project, cwd=cwd, log=False)
+    entries = search_entries(scope=scope, project=project, cwd=cwd)
     for entry in entries:
         if entry.get("id") == entry_id:
             return entry
     return None
+
+
+def rollup_next_steps(entries: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
+    """Collect open next_steps across entries, newest-first, deduped.
+
+    `entries` is expected in the order returned by search_entries (newest-first). For each
+    entry, every next_steps string is collected and deduped by normalized text (strip +
+    casefold), keeping the FIRST (newest) occurrence paired with its source entry. Returns
+    a list of (text, source_entry) tuples.
+    """
+    seen: set[str] = set()
+    rolled: list[tuple[str, dict[str, Any]]] = []
+    for entry in entries:
+        steps = entry.get("next_steps", [])
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            text = str(step).strip()
+            if not text:
+                continue
+            # Dedup key normalizes case AND collapses internal whitespace so trivially
+            # reworded duplicates ("fix  bug" vs "Fix bug") roll up to one entry.
+            key = " ".join(text.split()).casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            rolled.append((text, entry))
+    return rolled
 
 
 def to_json(entries: list[dict[str, Any]]) -> str:

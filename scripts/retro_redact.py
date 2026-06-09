@@ -35,6 +35,12 @@ def redact_value_everywhere(
     project: str | None = None,
     cwd: str | Path | None = None,
 ) -> dict[str, Any]:
+    if not value or not value.strip():
+        raise ValueError(
+            "redact value must be a non-empty, non-whitespace string; an empty value is "
+            "'contained' in every string and would inject the placeholder between every "
+            "character of every field, corrupting all records"
+        )
     kedu_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
     paths_mod.ensure_base_dirs(kedu_paths)
     changes: list[dict[str, Any]] = []
@@ -69,6 +75,7 @@ def redact_value_everywhere(
             "change_count": sum(item["entries"] for item in changes),
             "changes": changes,
         }
-        util.append_jsonl(kedu_paths.redaction_log, event)
+        redacted_event, _ = redact.redact_value(event, "redaction_log")
+        util.append_jsonl(kedu_paths.redaction_log, redacted_event)
     return event
 

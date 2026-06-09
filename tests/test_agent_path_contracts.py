@@ -11,10 +11,17 @@ When a vendor changes a path, update the citation and the assertion together.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from scripts import capture, cleanup, init_cmd, paths
+
+
+def _repo_root() -> Path:
+    """Resolve the development/ repo root from init_cmd's location, cwd-independent."""
+    # init_cmd.py lives at <repo>/scripts/init_cmd.py
+    return Path(init_cmd.__file__).resolve().parents[1]
 
 
 # --------------------------------------------------------------------------------------
@@ -23,19 +30,35 @@ from scripts import capture, cleanup, init_cmd, paths
 # under ~/.claude/. https://docs.claude.com/en/docs/claude-code/skills
 # --------------------------------------------------------------------------------------
 
+def _assert_skill_frontmatter(path: Path, *, name: str) -> str:
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---"), f"{path} must open with YAML frontmatter"
+    frontmatter = text.split("---", 2)[1]
+    assert f"name: {name}" in frontmatter
+    assert "description:" in frontmatter
+    return text
+
+
 def test_contract_claude_local(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="claude", cwd=project)
-    assert (project / "CLAUDE.md").exists()
-    assert (project / ".claude" / "skills" / "kedu" / "SKILL.md").exists()
+    skills = project / ".claude" / "skills"
+    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    # Skill-first: no CLAUDE.md block written, no unified /kedu skill.
+    assert not (project / "CLAUDE.md").exists()
+    assert not (skills / "kedu" / "SKILL.md").exists()
 
 
 def test_contract_claude_global(kedu_env, monkeypatch, tmp_path):
     claude_home = tmp_path / "claude-home"
     monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
     init_cmd.init_kedu(mode="global", agent="claude", cwd=kedu_env["project"])
-    assert (claude_home / "CLAUDE.md").exists()
-    assert (claude_home / "skills" / "kedu" / "SKILL.md").exists()
+    skills = claude_home / "skills"
+    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    assert not (claude_home / "CLAUDE.md").exists()
+    assert not (skills / "kedu" / "SKILL.md").exists()
 
 
 # --------------------------------------------------------------------------------------
@@ -50,8 +73,11 @@ def test_contract_claude_global(kedu_env, monkeypatch, tmp_path):
 def test_contract_codex_local(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
-    assert (project / ".agents" / "skills" / "kedu" / "SKILL.md").exists()
+    skills = project / ".agents" / "skills"
+    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
     assert not (project / "AGENTS.md").exists()
+    assert not (skills / "kedu" / "SKILL.md").exists()
 
 
 def test_contract_codex_global(kedu_env, monkeypatch, tmp_path):
@@ -60,7 +86,9 @@ def test_contract_codex_global(kedu_env, monkeypatch, tmp_path):
     monkeypatch.setenv("AGENT_HOME", str(agent_home))
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
     init_cmd.init_kedu(mode="global", agent="codex", cwd=kedu_env["project"])
-    assert (agent_home / ".agents" / "skills" / "kedu" / "SKILL.md").exists()
+    skills = agent_home / ".agents" / "skills"
+    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
     # Regression guards for the original bug:
     assert not (codex_home / "skills" / "kedu").exists()
     assert not (codex_home / "AGENTS.md").exists()
@@ -68,30 +96,40 @@ def test_contract_codex_global(kedu_env, monkeypatch, tmp_path):
 
 def test_contract_codex_skill_has_required_frontmatter(kedu_env):
     # https://developers.openai.com/codex/skills: "The SKILL.md file must include name
-    # and description."
+    # and description." Both skills must carry it, and the log skill must resolve the
+    # {agent} token to the codex identity.
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
-    text = (project / ".agents" / "skills" / "kedu" / "SKILL.md").read_text(encoding="utf-8")
-    assert text.startswith("---"), "SKILL.md must open with YAML frontmatter"
-    frontmatter = text.split("---", 2)[1]
-    assert "name:" in frontmatter
-    assert "description:" in frontmatter
+    log_text = _assert_skill_frontmatter(
+        project / ".agents" / "skills" / "kedu-log" / "SKILL.md", name="kedu-log"
+    )
+    assert "--agent codex" in log_text
+    assert "{agent}" not in log_text
+    _assert_skill_frontmatter(
+        project / ".agents" / "skills" / "kedu-search" / "SKILL.md", name="kedu-search"
+    )
 
 
 # --------------------------------------------------------------------------------------
 # Kiro
-# Contract: steering at .kiro/steering/<name>.md, CLI agent at .kiro/agents/<name>.json,
-# and Agent Skill at .kiro/skills/<name>/SKILL.md. User-level under ~/.kiro/. Kiro is
-# wired via steering (always-on baseline) and an Agent Skill (the `/kedu` slash command,
-# available in both CLI and IDE). The old .kiro/prompts/ saved prompt is retired.
+# Contract: SKILL-FIRST. CLI agent at .kiro/agents/<name>.json and Agent Skill at
+# .kiro/skills/<name>/SKILL.md (the `/kedu` slash command, used by both IDE and CLI).
+# The CLI agent registers the skill through its `resources` field. User-level under
+# ~/.kiro/. NO steering file is written (always-on steering made Kiro IDE unreliable at
+# writing records), and the old .kiro/prompts/ saved prompt is retired.
 # --------------------------------------------------------------------------------------
 
 def test_contract_kiro_local(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
-    assert (project / ".kiro" / "steering" / "kedu.md").exists()
     assert (project / ".kiro" / "agents" / "kedu.json").exists()
-    assert (project / ".kiro" / "skills" / "kedu" / "SKILL.md").exists()
+    skills = project / ".kiro" / "skills"
+    log_text = _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    assert "--agent kiro" in log_text
+    assert "{agent}" not in log_text
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    assert not (skills / "kedu" / "SKILL.md").exists()
+    assert not (project / ".kiro" / "steering" / "kedu.md").exists()
     assert not (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
 
 
@@ -99,9 +137,12 @@ def test_contract_kiro_global(kedu_env, monkeypatch, tmp_path):
     kiro_home = tmp_path / "kiro-home"
     monkeypatch.setenv("KIRO_HOME", str(kiro_home))
     init_cmd.init_kedu(mode="global", agent="kiro", cwd=kedu_env["project"])
-    assert (kiro_home / "steering" / "kedu.md").exists()
     assert (kiro_home / "agents" / "kedu.json").exists()
-    assert (kiro_home / "skills" / "kedu" / "SKILL.md").exists()
+    skills = kiro_home / "skills"
+    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    assert not (skills / "kedu" / "SKILL.md").exists()
+    assert not (kiro_home / "steering" / "kedu.md").exists()
     assert not (kiro_home / "prompts" / "kedu-agent-prompt.md").exists()
 
 
@@ -114,7 +155,14 @@ def test_contract_kiro_global(kedu_env, monkeypatch, tmp_path):
 def test_contract_cursor_local(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="cursor", cwd=project)
-    assert (project / ".cursor" / "rules" / "kedu.mdc").exists()
+    rule = project / ".cursor" / "rules" / "kedu.mdc"
+    assert rule.exists()
+    # Cursor has no slash-command skills: one rule carries BOTH bodies.
+    text = rule.read_text(encoding="utf-8")
+    assert "alwaysApply: false" in text
+    assert "Save a Kedu Session Record" in text  # log body
+    assert "Search Kedu Session Records" in text  # search body
+    assert "--agent cursor" in text
 
 
 def test_contract_cursor_global(kedu_env, monkeypatch, tmp_path):
@@ -134,31 +182,39 @@ def test_contract_cursor_global(kedu_env, monkeypatch, tmp_path):
 def test_contract_codex_uninstall_removes_skill(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
-    skill = project / ".agents" / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
+    skills = project / ".agents" / "skills"
+    assert (skills / "kedu-log" / "SKILL.md").exists()
+    assert (skills / "kedu-search" / "SKILL.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("codex",), dry_run=False)
-    assert not skill.exists()
+    assert not (skills / "kedu-log").exists()
+    assert not (skills / "kedu-search").exists()
 
 
 def test_contract_claude_uninstall_removes_skill(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="claude", cwd=project)
-    skill = project / ".claude" / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
+    skills = project / ".claude" / "skills"
+    assert (skills / "kedu-log" / "SKILL.md").exists()
+    assert (skills / "kedu-search" / "SKILL.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("claude",), dry_run=False)
-    assert not skill.exists()
+    assert not (skills / "kedu-log").exists()
+    assert not (skills / "kedu-search").exists()
 
 
-def test_contract_kiro_uninstall_removes_steering(kedu_env):
+def test_contract_kiro_uninstall_removes_skill_and_agent(kedu_env):
     project = kedu_env["project"]
     init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
-    steering = project / ".kiro" / "steering" / "kedu.md"
-    skill = project / ".kiro" / "skills" / "kedu" / "SKILL.md"
-    assert steering.exists()
-    assert skill.exists()
+    cli_agent = project / ".kiro" / "agents" / "kedu.json"
+    skills = project / ".kiro" / "skills"
+    # Skill-first init creates the CLI agent and the two skills, not a steering file.
+    assert cli_agent.exists()
+    assert (skills / "kedu-log" / "SKILL.md").exists()
+    assert (skills / "kedu-search" / "SKILL.md").exists()
+    assert not (project / ".kiro" / "steering" / "kedu.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("kiro",), dry_run=False)
-    assert not steering.exists()
-    assert not skill.exists()
+    assert not cli_agent.exists()
+    assert not (skills / "kedu-log").exists()
+    assert not (skills / "kedu-search").exists()
 
 
 def test_contract_cursor_uninstall_removes_rule(kedu_env):
@@ -245,3 +301,39 @@ def test_contract_uninstall_preserves_records(kedu_env):
 
     assert short.exists()
     assert long_file.exists()
+
+
+# --------------------------------------------------------------------------------------
+# Shipped templates vs generated behavior
+# Contract: the checked-in support templates under agents/kiro/ must not contradict what
+# `kedu init` generates. The Kiro integration is skill-first, so the shipped agent config
+# must register the skill via `resources` and must not claim "not a Kiro skill" or point
+# at the retired prompts path. Retired template files must be absent from the repo.
+# --------------------------------------------------------------------------------------
+
+def test_release_template_kiro_agent_matches_generated():
+    repo = _repo_root()
+    template_path = repo / "agents" / "kiro" / "agents" / "kedu.json"
+    assert template_path.exists()
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+    generated = json.loads(init_cmd._kiro_agent_config())
+
+    # Static fields must match the generator.
+    assert template["resources"] == generated["resources"]
+    assert "skill://.kiro/skills/*/SKILL.md" in template["resources"]
+    assert template["name"] == generated["name"]
+    assert template["tools"] == generated["tools"]
+
+    # Skill-first prompt: no stale "not a Kiro skill" claim, must reference both skills,
+    # must not point at the retired saved-prompt path.
+    prompt = template["prompt"]
+    assert "not a Kiro skill" not in prompt
+    assert ".kiro/skills/kedu-log/SKILL.md" in prompt
+    assert ".kiro/skills/kedu-search/SKILL.md" in prompt
+    assert "kedu-agent-prompt" not in prompt
+
+
+def test_release_templates_retired_paths_absent():
+    repo = _repo_root()
+    assert not (repo / "agents" / "kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    assert not (repo / "agents" / "kiro" / "steering" / "kedu.md").exists()

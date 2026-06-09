@@ -9,7 +9,7 @@ SOURCE="${1:-manual}"
 BODY="${2:-}"
 
 if [ -z "$BODY" ]; then
-  echo "usage: claude_code.sh <manual|clean_exit|agent> <entry-json-file>" >&2
+  echo "usage: claude_code.sh <manual|agent> <entry-json-file>" >&2
   exit 2
 fi
 

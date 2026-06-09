@@ -57,34 +57,24 @@ Local init means "enable Kedu for this host in the current project." It creates:
 ```text
 <project>/.kedu/
 ├── short.jsonl
-├── STATE.md
 └── config.json
 ```
 
-It also writes project-local host integration:
+It also writes project-local host integration. Kedu is skill-first: each agent gets two
+explicit skills — `kedu-log` (save a record) and `kedu-search` (retrieve history) — with no
+always-on `CLAUDE.md` block and no `STATE.md`. The skills carry trigger-tuned descriptions
+so the agent auto-discovers them; they mandate nothing on init.
 
-- Claude: appends a line-counted Kedu block to `CLAUDE.md` and writes the unified `/kedu` skill under `.claude/skills/kedu/`
-- Codex: appends a Kedu block to `AGENTS.md`
-- Kiro: writes `.kiro/steering/kedu.md`, a Kiro CLI agent at `.kiro/agents/kedu.json`, and `.kiro/prompts/kedu-agent-prompt.md`
-- Cursor: writes `.cursor/rules/kedu.mdc`
+- Claude: writes `.claude/skills/kedu-log/SKILL.md` and `.claude/skills/kedu-search/SKILL.md`. No `CLAUDE.md` block.
+- Codex: writes `.agents/skills/kedu-log/SKILL.md` and `.agents/skills/kedu-search/SKILL.md`.
+- Kiro: writes a Kiro CLI agent at `.kiro/agents/kedu.json` plus `.kiro/skills/kedu-log/SKILL.md` and `.kiro/skills/kedu-search/SKILL.md` (skill-first; no steering file and no saved prompt). The agent config registers both skills through its `resources` glob.
+- Cursor: writes one `.cursor/rules/kedu.mdc` containing both the log and search guidance. **Cursor IDE is unverified — only the Cursor CLI is tested.**
 
-Claude `CLAUDE.md` sections are wrapped as:
-
-```text
-====kedu start ====
-...
-====kedu stop line:N====
-```
-
-`N` is the number of content lines written by Kedu. Uninstall removes only this marked
-section and leaves the rest of `CLAUDE.md` intact.
-
-In Claude Code, use one command surface:
+In Claude Code, Codex, and Kiro, invoke the skills directly:
 
 ```text
-/kedu log
-/kedu search <query>
-/kedu <specific instruction about creating or retrieving durable memory>
+/kedu-log
+/kedu-search <query>
 ```
 
 If the project is a git repo, `.kedu/` is added to `.git/info/exclude`, not `.gitignore`.
@@ -115,7 +105,6 @@ All agents share one store:
 ~/.kedu/
 ├── long/
 ├── archive/
-├── query_log.jsonl
 └── redaction_log.jsonl
 ```
 
@@ -190,24 +179,26 @@ kedu uninstall
 ```
 
 By default, uninstall removes the user-level install, generated Kedu wiring in the current
-project, and generated Kedu wiring in discovered Kedu-enabled projects under common
-project roots. Use `--user-only` for only the machine-level installation:
+project, and generated Kedu wiring in ALL discovered Kedu-enabled projects under common
+project roots. Pass `--no-scan-projects` to limit cleanup to the current project, or
+`--user-only` for only the machine-level installation:
 
 - remove the `kedu` CLI shim
 - remove the installed engine copy at `~/.kedu/kedu`
 - remove support templates under `~/.kedu/adapters` and `~/.kedu/agents`
+- remove the runtime lock file `~/.kedu/.kedu.lock`
 - remove generated global host integrations for selected hosts
 
 Use `--project-only` or `--project-root /path/to/project` for project-local wiring:
 
-- remove generated Codex/Claude instruction blocks
-- remove generated Kiro steering and hook files
+- remove generated Codex/Claude `kedu-log` and `kedu-search` skills (and any legacy `CLAUDE.md` block or unified `/kedu` skill left by older installs)
+- remove the generated Kiro CLI agent (`.kiro/agents/kedu.json`) and the `kedu-log`/`kedu-search` skills (`.kiro/skills/`); also purge any legacy `.kiro/skills/kedu/`, `.kiro/steering/kedu.md`, and `.kiro/prompts/kedu-agent-prompt.md` left by older installs
 - remove generated Cursor rules
 - preserve only `.kedu/short.jsonl` when local short records exist
-- remove generated `.kedu/STATE.md`, `.kedu/config.json`, and temp entry files
+- remove `.kedu/config.json`, temp entry files, and any legacy `.kedu/STATE.md` left by older installs
 - remove `.kedu/` when no local short records exist
 
-Uninstall does not delete `~/.kedu/long`, `~/.kedu/archive`, query logs, redaction logs, or
+Uninstall does not delete `~/.kedu/long`, `~/.kedu/archive`, redaction logs, or
 global long/archive records for any project.
 
 To preview project discovery explicitly:
@@ -218,7 +209,7 @@ kedu uninstall --dry-run --scan-root /path/to/projects
 
 ## Open Validation Items
 
-- Test Kiro behavior when global and local steering both exist.
+- Test Kiro skill-first behavior (IDE `kedu-log`/`kedu-search` skills and CLI agent registering them via `resources`) when global and local agents both exist.
 - Test Claude/Codex skill discovery after the Kedu rename.
 - Test clean-exit hooks per host.
 - Test install after deleting the original checkout.

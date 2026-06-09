@@ -110,5 +110,19 @@ def parse_iso(ts: str):
     return parsed
 
 
+def try_parse_iso(ts):
+    """Parse ``ts`` like ``parse_iso`` but return ``None`` instead of raising.
+
+    Returns a tz-aware ``datetime`` when ``ts`` is a parseable ISO 8601 string,
+    otherwise ``None`` (non-string input or unparseable value).
+    """
+    if not isinstance(ts, str):
+        return None
+    try:
+        return parse_iso(ts)
+    except (ValueError, TypeError):
+        return None
+
+
 def jsonable_copy(value: Any) -> Any:
     return json.loads(json.dumps(value, ensure_ascii=False))

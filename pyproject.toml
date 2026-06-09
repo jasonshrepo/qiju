@@ -1,7 +1,7 @@
 [project]
 name = "kedu"
-version = "0.1.0"
-description = "Local-first, lossless session records for AI coding agents"
+version = "0.2.0"
+description = "Local-first, lossless session record layer for AI coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -36,3 +36,6 @@ testpaths = ["tests"]
 
 [tool.setuptools]
 packages = ["scripts"]
+
+[tool.setuptools.package-data]
+scripts = ["config/*.json"]

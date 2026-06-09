@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts import capture, paths, query_log, search, util
+from scripts import capture, search, util
 from tests.conftest import sample_entry
 
 
@@ -41,30 +41,82 @@ def test_body_scan_finds_terms_not_in_metadata(kedu_env):
     assert len(results) == 1
 
 
-def test_query_log_is_written_and_redacted(kedu_env):
-    capture.log_entry(sample_entry(body_md="hello"), source="manual", project="repo", cwd=kedu_env["project"])
-    search.search_entries(scope="current_project", project="repo", cwd=kedu_env["project"], query="AKIAIOSFODNN7EXAMPLE")
-    kedu_paths = paths.resolve_paths(project="repo", cwd=kedu_env["project"])
-    events = util.read_jsonl(kedu_paths.query_log)
-    assert events
-    assert events[-1]["query"] == "[REDACTED:aws_access_key]"
-
-
-def test_query_log_failure_does_not_abort_search(kedu_env, monkeypatch, capsys):
-    capture.log_entry(sample_entry(body_md="hello"), source="manual", project="repo", cwd=kedu_env["project"])
-
-    def fail_append(*_args, **_kwargs):
-        raise OSError("query log unavailable")
-
-    monkeypatch.setattr(query_log.util, "append_jsonl", fail_append)
-    results = search.search_entries(scope="current_project", project="repo", cwd=kedu_env["project"], query="hello")
-
-    assert len(results) == 1
-    assert "warning: failed to write query log: query log unavailable" in capsys.readouterr().err
-
-
 def test_agent_filter(kedu_env):
     capture.log_entry(sample_entry(id="claude:1", agent="claude-code", body_md="shared fix"), source="manual", project="repo", cwd=kedu_env["project"])
     capture.log_entry(sample_entry(id="codex:1", agent="codex", body_md="shared fix"), source="manual", project="repo", cwd=kedu_env["project"])
     results = search.search_entries(scope="current_project", project="repo", cwd=kedu_env["project"], query="shared", agent="codex")
     assert [entry["agent"] for entry in results] == ["codex"]
+
+
+def test_rollup_next_steps_dedupes_keeping_newest(kedu_env):
+    capture.log_entry(
+        sample_entry(id="old:1", ts="2026-06-01T10:00:00+10:00", next_steps=["Ship release", "Write docs"]),
+        source="manual", project="repo", cwd=kedu_env["project"],
+    )
+    capture.log_entry(
+        sample_entry(id="new:1", ts="2026-06-05T10:00:00+10:00", next_steps=["ship release", "Add tests"]),
+        source="manual", project="repo", cwd=kedu_env["project"],
+    )
+    results = search.search_entries(scope="current_project", project="repo", cwd=kedu_env["project"])
+    rolled = search.rollup_next_steps(results)
+    texts = [text for text, _ in rolled]
+    # "Ship release"/"ship release" dedupe to one entry, keeping the newest occurrence.
+    assert texts.count("ship release") == 1
+    assert "Ship release" not in texts
+    assert "Add tests" in texts
+    assert "Write docs" in texts
+    # The kept duplicate is paired with the newest source record.
+    ship_source = next(src for text, src in rolled if text == "ship release")
+    assert ship_source["id"] == "new:1"
+
+
+def test_rollup_next_steps_respects_time_filter(kedu_env):
+    home = kedu_env["home"]
+    long_file = home / "long" / "repo.jsonl"
+    long_file.parent.mkdir(parents=True, exist_ok=True)
+    util.append_jsonl(long_file, sample_entry(id="inrange:1", ts="2026-06-02T10:00:00+10:00", next_steps=["In-range task"]))
+    util.append_jsonl(long_file, sample_entry(id="outrange:1", ts="2026-01-01T10:00:00+10:00", next_steps=["Out-of-range task"]))
+
+    results = search.search_entries(
+        scope="current_project", project="repo", cwd=kedu_env["project"],
+        since="2026-06-01", until="2026-06-03",
+    )
+    rolled = search.rollup_next_steps(results)
+    texts = [text for text, _ in rolled]
+    assert "In-range task" in texts
+    assert "Out-of-range task" not in texts
+
+
+def test_format_actions_cli_output(kedu_env, capsys):
+    from scripts import kedu as kedu_mod
+
+    capture.log_entry(
+        sample_entry(id="a:1", ts="2026-06-05T10:00:00+10:00", title="Auth work", next_steps=["Finish login"]),
+        source="manual", project="repo", cwd=kedu_env["project"],
+    )
+    args = kedu_mod.build_parser().parse_args([
+        "search", "--scope", "current_project", "--project", "repo", "--format", "actions",
+    ])
+    rc = kedu_mod.cmd_search(args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert '- [ ] Finish login  (from: 2026-06-05 "Auth work")' in out
+
+
+def test_time_filtered_search_excludes_malformed_ts(kedu_env):
+    home = kedu_env["home"]
+    long_file = home / "long" / "repo.jsonl"
+    long_file.parent.mkdir(parents=True, exist_ok=True)
+    util.append_jsonl(long_file, sample_entry(id="bad:1", ts="not-a-date"))
+    util.append_jsonl(long_file, sample_entry(id="good:1", ts="2026-06-02T10:00:00+10:00"))
+
+    results = search.search_entries(
+        scope="current_project",
+        project="repo",
+        cwd=kedu_env["project"],
+        since="2026-06-01",
+        until="2026-06-03",
+    )
+    ids = {entry["id"] for entry in results}
+    assert "good:1" in ids
+    assert "bad:1" not in ids

@@ -54,3 +54,12 @@ def test_normalize_entry_fills_expected_defaults():
 def test_id_generation_is_deterministic_for_explicit_session(kedu_env):
     kedu_paths = paths.resolve_paths(project="repo", cwd=kedu_env["project"])
     assert id_gen.make_id(kedu_paths, explicit_session_uuid="abc", explicit_seq=2) == "abc:2"
+
+
+def test_schema_rejects_unparseable_ts():
+    with pytest.raises(schema.ValidationError, match="ts must be an ISO 8601 datetime"):
+        schema.validate(sample_entry(ts="not-a-date"))
+
+
+def test_schema_accepts_valid_ts():
+    assert schema.validate(sample_entry(ts="2026-05-31T10:00:00+10:00"))["id"] == "session-1:1"

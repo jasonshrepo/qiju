@@ -179,6 +179,18 @@ def _prune_project_kedu_to_short(kedu_paths: paths_mod.KeduPaths, result: Cleanu
         result.preserved.append({"path": str(kedu_paths.project_kedu_dir), "reason": "project .kedu directory does not exist"})
         return
 
+    # SAFETY GUARD: if the project's .kedu directory resolves to — or is an ancestor of —
+    # the global Kedu store, refuse to touch it. Otherwise (e.g. running uninstall from
+    # $HOME, where project_root/.kedu == ~/.kedu) we would rm -rf the global long/archive
+    # records. Memory is NEVER removed by uninstall.
+    home_store = paths_mod.kedu_home()
+    if _contains_path(kedu_paths.project_kedu_dir, home_store):
+        result.preserved.append({
+            "path": str(kedu_paths.project_kedu_dir),
+            "reason": "project .kedu resolves to the global Kedu store; refusing to remove memory (long/archive)",
+        })
+        return
+
     short_count = _entry_count(kedu_paths.short_jsonl)
     long_count = _entry_count(kedu_paths.long_jsonl)
     if long_count:
@@ -236,6 +248,13 @@ def cleanup_user_install(
     for child in ("adapters", "agents", "logs"):
         _remove_dir(kedu_home / child, result, "remove installed Kedu support templates", dry_run=dry_run)
 
+    # The query_log feature was removed; a query_log.jsonl left by a prior install is now
+    # orphaned non-memory data. Remove it (redaction_log.jsonl is audit data — preserved).
+    _remove_file(kedu_home / "query_log.jsonl", result, "remove legacy Kedu query log", dry_run=dry_run)
+
+    # The lock file is an empty fcntl lock created at runtime by writes — operational, not memory.
+    _remove_file(kedu_home / ".kedu.lock", result, "remove Kedu runtime lock", dry_run=dry_run)
+
     launch_agents = Path.home() / "Library" / "LaunchAgents"
     if launch_agents.exists():
         for plist in launch_agents.glob("*.kedu*.plist"):
@@ -246,7 +265,9 @@ def cleanup_user_install(
         agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
         _remove_kedu_block(codex_home / "AGENTS.md", result, dry_run=dry_run)
         _remove_dir(codex_home / "skills" / "kedu", result, "remove legacy global Codex Kedu skill", dry_run=dry_run)
-        _remove_dir(agent_home / ".agents" / "skills" / "kedu", result, "remove global Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "kedu", result, "remove legacy global Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "kedu-log", result, "remove global Codex Kedu log skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "kedu-search", result, "remove global Codex Kedu search skill", dry_run=dry_run)
     if "claude" in hosts:
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
         _remove_kedu_block(claude_home / "CLAUDE.md", result, dry_run=dry_run)
@@ -255,15 +276,19 @@ def cleanup_user_install(
         _remove_dir(claude_home / "skills" / "kedu-search", result, "remove Claude Kedu search skill", dry_run=dry_run)
     if "kiro" in hosts:
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
+        # Init is skill-first and no longer writes Kiro steering or a saved prompt, but
+        # legacy installs may still have them — purge them as the cleanup safety net.
         _remove_file_if_contains(kiro_home / "steering" / "kedu.md", "Kedu", result, "remove global Kiro Kedu steering", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "agents" / "kedu.json", "Kedu", result, "remove global Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(kiro_home / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove global Kiro Kedu prompt", dry_run=dry_run)
-        _remove_dir(kiro_home / "skills" / "kedu", result, "remove global Kiro Kedu skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "kedu", result, "remove legacy global Kiro Kedu skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "kedu-log", result, "remove global Kiro Kedu log skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "kedu-search", result, "remove global Kiro Kedu search skill", dry_run=dry_run)
     if "cursor" in hosts:
         cursor_home = Path(os.environ.get("CURSOR_HOME", "~/.cursor")).expanduser()
         _remove_file_if_contains(cursor_home / "rules" / "kedu.mdc", "Kedu", result, "remove global Cursor Kedu rule", dry_run=dry_run)
 
-    for preserved_name in ("long", "archive", "query_log.jsonl", "redaction_log.jsonl"):
+    for preserved_name in ("long", "archive", "redaction_log.jsonl"):
         path = kedu_home / preserved_name
         if path.exists():
             result.preserved.append({"path": str(path), "reason": "Kedu records/audit data are never removed by uninstall"})
@@ -282,17 +307,23 @@ def cleanup_project_install(
 
     if "codex" in hosts:
         _remove_kedu_block(project_root / "AGENTS.md", result, dry_run=dry_run)
-        _remove_dir(project_root / ".agents" / "skills" / "kedu", result, "remove project Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "kedu", result, "remove legacy project Codex Kedu skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "kedu-log", result, "remove project Codex Kedu log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "kedu-search", result, "remove project Codex Kedu search skill", dry_run=dry_run)
     if "claude" in hosts:
         _remove_kedu_block(project_root / "CLAUDE.md", result, dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu", result, "remove project Claude Kedu skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-log", result, "remove project Claude Kedu log skill", dry_run=dry_run)
         _remove_dir(project_root / ".claude" / "skills" / "kedu-search", result, "remove project Claude Kedu search skill", dry_run=dry_run)
     if "kiro" in hosts:
+        # Init is skill-first and no longer writes Kiro steering or a saved prompt, but
+        # legacy installs may still have them — purge them as the cleanup safety net.
         _remove_file_if_contains(project_root / ".kiro" / "steering" / "kedu.md", "Kedu", result, "remove project Kiro Kedu steering", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "agents" / "kedu.json", "Kedu", result, "remove project Kiro Kedu CLI agent", dry_run=dry_run)
         _remove_file_if_contains(project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove project Kiro Kedu prompt", dry_run=dry_run)
-        _remove_dir(project_root / ".kiro" / "skills" / "kedu", result, "remove project Kiro Kedu skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "kedu", result, "remove legacy project Kiro Kedu skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "kedu-log", result, "remove project Kiro Kedu log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "kedu-search", result, "remove project Kiro Kedu search skill", dry_run=dry_run)
     if "cursor" in hosts:
         _remove_file_if_contains(project_root / ".cursor" / "rules" / "kedu.mdc", "Kedu", result, "remove project Cursor Kedu rule", dry_run=dry_run)
 
@@ -358,10 +389,14 @@ def _looks_like_kedu_project(path: Path) -> bool:
             path / ".kiro" / "agents" / "kedu.json",
             path / ".kiro" / "steering" / "kedu.md",
             path / ".kiro" / "skills" / "kedu" / "SKILL.md",
+            path / ".kiro" / "skills" / "kedu-log" / "SKILL.md",
+            path / ".kiro" / "skills" / "kedu-search" / "SKILL.md",
             path / ".claude" / "skills" / "kedu" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-log" / "SKILL.md",
             path / ".claude" / "skills" / "kedu-search" / "SKILL.md",
             path / ".agents" / "skills" / "kedu" / "SKILL.md",
+            path / ".agents" / "skills" / "kedu-log" / "SKILL.md",
+            path / ".agents" / "skills" / "kedu-search" / "SKILL.md",
             path / ".cursor" / "rules" / "kedu.mdc",
         )
     )

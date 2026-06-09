@@ -47,9 +47,37 @@ def test_user_cleanup_removes_installation_but_preserves_records(kedu_env, tmp_p
     assert not (home / "logs").exists()
     assert (long_dir / "repo.jsonl").exists()
     assert (archive_dir / "entries.parquet").exists()
-    assert (home / "query_log.jsonl").exists()
+    # The query_log feature was removed: a pre-existing legacy query log is now deleted,
+    # while the redaction-log audit trail is still preserved.
+    assert not (home / "query_log.jsonl").exists()
     assert (home / "redaction_log.jsonl").exists()
+    assert any("legacy Kedu query log" in action.reason for action in result.actions)
     assert any("never removed" in item["reason"] for item in result.preserved)
+
+
+def test_global_cleanup_removes_codex_and_kiro_skills(kedu_env, tmp_path, monkeypatch):
+    agent_home = tmp_path / "agent-home"
+    kiro_home = tmp_path / "kiro-home"
+    monkeypatch.setenv("AGENT_HOME", str(agent_home))
+    monkeypatch.setenv("KIRO_HOME", str(kiro_home))
+    init_cmd.init_kedu(mode="global", agent="codex", cwd=kedu_env["project"])
+    init_cmd.init_kedu(mode="global", agent="kiro", cwd=kedu_env["project"])
+    assert (agent_home / ".agents" / "skills" / "kedu-log" / "SKILL.md").exists()
+    assert (kiro_home / "skills" / "kedu-search" / "SKILL.md").exists()
+
+    cleanup.cleanup(
+        user=True,
+        project_root=None,
+        hosts=("codex", "kiro"),
+        bin_dir=tmp_path / "bin",
+        install_root=tmp_path / "install-root",
+        dry_run=False,
+    )
+
+    assert not (agent_home / ".agents" / "skills" / "kedu-log").exists()
+    assert not (agent_home / ".agents" / "skills" / "kedu-search").exists()
+    assert not (kiro_home / "skills" / "kedu-log").exists()
+    assert not (kiro_home / "skills" / "kedu-search").exists()
 
 
 def test_user_cleanup_refuses_install_root_that_overlaps_record_store(kedu_env, tmp_path):
@@ -101,13 +129,24 @@ def test_project_cleanup_preserves_project_kedu_when_short_records_exist(kedu_en
 
     assert (project / ".kedu").exists()
     assert short.exists()
-    assert not (project / ".kedu" / "STATE.md").exists()
     assert not (project / ".kedu" / "config.json").exists()
     assert not (project / ".kiro" / "steering" / "kedu.md").exists()
     assert not (project / ".kiro" / "agents" / "kedu.json").exists()
     assert not (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
-    assert not (project / ".kiro" / "skills" / "kedu").exists()
+    assert not (project / ".kiro" / "skills" / "kedu-log").exists()
+    assert not (project / ".kiro" / "skills" / "kedu-search").exists()
     assert any("short=1" in item["reason"] for item in result.preserved)
+
+
+def test_project_cleanup_removes_codex_skills(kedu_env):
+    project = kedu_env["project"]
+    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+    assert (project / ".agents" / "skills" / "kedu-log" / "SKILL.md").exists()
+
+    cleanup.cleanup(user=False, project_root=project, hosts=("codex",), dry_run=False)
+
+    assert not (project / ".agents" / "skills" / "kedu-log").exists()
+    assert not (project / ".agents" / "skills" / "kedu-search").exists()
 
 
 def test_project_cleanup_removes_project_claude_skills(kedu_env):
@@ -243,6 +282,153 @@ def test_cleanup_scans_project_roots_and_prunes_to_short(kedu_env, tmp_path):
     assert not (project_b / ".kedu").exists()
     assert not (project_b / ".claude" / "skills" / "kedu").exists()
     assert not result.warnings
+
+
+def test_user_cleanup_removes_runtime_lock_but_preserves_records(kedu_env, tmp_path):
+    home = kedu_env["home"]
+    home.mkdir(parents=True, exist_ok=True)
+    lock = home / ".kedu.lock"
+    lock.write_text("", encoding="utf-8")
+    long_dir = home / "long"
+    long_dir.mkdir(parents=True)
+    (long_dir / "repo.jsonl").write_text('{"id":"1"}\n', encoding="utf-8")
+    (home / "redaction_log.jsonl").write_text('{"event":"x"}\n', encoding="utf-8")
+
+    result = cleanup.cleanup(
+        user=True,
+        project_root=None,
+        hosts=(),
+        bin_dir=tmp_path / "bin",
+        install_root=tmp_path / "install-root",
+        dry_run=False,
+    )
+
+    assert not lock.exists()
+    assert (long_dir / "repo.jsonl").exists()
+    assert (home / "redaction_log.jsonl").exists()
+    assert any("runtime lock" in action.reason for action in result.actions)
+
+
+def test_cleanup_scans_multiple_projects_and_preserves_short(kedu_env, tmp_path):
+    scan_root = tmp_path / "scan-root"
+    project_a = scan_root / "project-a"
+    project_b = scan_root / "project-b"
+    for project in (project_a, project_b):
+        skill_dir = project / ".claude" / "skills" / "kedu-log"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("Kedu skill", encoding="utf-8")
+        kedu_dir = project / ".kedu"
+        kedu_dir.mkdir(parents=True)
+        (kedu_dir / "short.jsonl").write_text(json.dumps({"id": "x:1"}) + "\n", encoding="utf-8")
+
+    result = cleanup.cleanup(
+        user=False,
+        project_root=None,
+        scan_projects=True,
+        scan_roots=[scan_root],
+        dry_run=False,
+    )
+
+    assert not (project_a / ".claude" / "skills" / "kedu-log").exists()
+    assert not (project_b / ".claude" / "skills" / "kedu-log").exists()
+    assert (project_a / ".kedu" / "short.jsonl").exists()
+    assert (project_b / ".kedu" / "short.jsonl").exists()
+    assert not result.warnings
+
+
+def test_project_cleanup_refuses_when_project_kedu_is_global_store(tmp_path, monkeypatch):
+    # Regression: running uninstall from a dir whose ".kedu" IS the global KEDU_HOME store
+    # (e.g. from $HOME) previously rm -rf'd ~/.kedu, destroying long/ and archive/.
+    store = tmp_path / ".kedu"
+    long_dir = store / "long"
+    archive_dir = store / "archive" / "project=proj" / "month=2026-01"
+    long_dir.mkdir(parents=True)
+    archive_dir.mkdir(parents=True)
+    long_file = long_dir / "proj.jsonl"
+    long_file.write_text(json.dumps({"id": "session-1:1"}) + "\n", encoding="utf-8")
+    (archive_dir / "entries.parquet").write_text("archive", encoding="utf-8")
+    monkeypatch.setenv("KEDU_HOME", str(store))
+
+    result = cleanup.cleanup(
+        user=False,
+        project_root=tmp_path,
+        scan_projects=False,
+        dry_run=False,
+    )
+
+    assert store.exists()
+    assert long_file.exists()
+    assert long_file.read_text(encoding="utf-8") == json.dumps({"id": "session-1:1"}) + "\n"
+    assert archive_dir.exists()
+    assert (archive_dir / "entries.parquet").exists()
+    assert any("refusing to remove memory" in item["reason"] for item in result.preserved)
+
+
+def test_full_uninstall_refuses_when_project_kedu_is_global_store(tmp_path, monkeypatch):
+    store = tmp_path / ".kedu"
+    long_dir = store / "long"
+    archive_dir = store / "archive" / "project=proj" / "month=2026-01"
+    long_dir.mkdir(parents=True)
+    archive_dir.mkdir(parents=True)
+    long_file = long_dir / "proj.jsonl"
+    long_file.write_text(json.dumps({"id": "session-1:1"}) + "\n", encoding="utf-8")
+    (archive_dir / "entries.parquet").write_text("archive", encoding="utf-8")
+    monkeypatch.setenv("KEDU_HOME", str(store))
+
+    cleanup.cleanup(
+        user=True,
+        project_root=tmp_path,
+        hosts=(),
+        bin_dir=tmp_path / "bin",
+        install_root=tmp_path / "install-root",
+        scan_projects=False,
+        dry_run=False,
+    )
+
+    assert long_file.exists()
+    assert long_file.read_text(encoding="utf-8") == json.dumps({"id": "session-1:1"}) + "\n"
+    assert archive_dir.exists()
+    assert (archive_dir / "entries.parquet").exists()
+
+
+def test_normal_project_cleanup_still_prunes_when_store_is_separate(kedu_env):
+    # Guard must not affect genuine projects whose .kedu is unrelated to KEDU_HOME.
+    project = kedu_env["project"]
+    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+    (project / ".kedu" / "config.json").write_text(
+        json.dumps({"project": "repo"}), encoding="utf-8"
+    )
+    (project / ".kedu" / "short.jsonl").write_text("", encoding="utf-8")
+
+    cleanup.cleanup(user=False, project_root=project, hosts=("codex",), dry_run=False)
+
+    assert not (project / ".kedu").exists()
+
+
+def test_uninstall_cli_scans_projects_by_default():
+    args = cleanup_cli_args(["uninstall"])
+    assert args.scan_projects is True
+
+
+def test_uninstall_cli_no_scan_projects_opt_out():
+    args = cleanup_cli_args(["uninstall", "--no-scan-projects"])
+    assert args.scan_projects is False
+
+
+def test_cmd_uninstall_user_only_disables_scan(kedu_env, tmp_path, monkeypatch):
+    from scripts import kedu as kedu_mod
+
+    captured = {}
+
+    def fake_cleanup(**kwargs):
+        captured.update(kwargs)
+        return cleanup.CleanupResult(dry_run=True)
+
+    monkeypatch.setattr(kedu_mod.cleanup_mod, "cleanup", fake_cleanup)
+    args = kedu_mod.build_parser().parse_args(["uninstall", "--user-only"])
+    assert kedu_mod.cmd_uninstall(args) == 0
+    assert captured["scan_projects"] is False
+    assert captured["project_root"] is None
 
 
 def test_uninstall_cli_supports_explicit_dry_run():

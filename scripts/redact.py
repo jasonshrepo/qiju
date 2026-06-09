@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
+import secrets
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
@@ -15,15 +17,26 @@ except ImportError:  # pragma: no cover
     import allowlist as allowlist_mod  # type: ignore
 
 
-RULES_PATH = Path(__file__).resolve().parents[1] / "config" / "redaction_rules.json"
+RULES_PATH = Path(__file__).resolve().parent / "config" / "redaction_rules.json"
 TOKEN_RE = re.compile(r"[A-Za-z0-9/+_.=:-]{20,}")
+
+# Random per-process salt, generated once and NEVER written to disk. Within a single
+# process the same raw value hashes consistently; across processes the digest differs.
+# Because the salt is never stored, the hashed token is irreversible and never contains
+# the raw matched value.
+_SALT = secrets.token_bytes(16)
+
+
+def _hash_token(text: str) -> str:
+    """Return a uniform redaction token derived from a salted SHA-256 of ``text``."""
+    digest = hashlib.sha256(_SALT + text.encode("utf-8")).hexdigest()[:16]
+    return f"[REDACTED:pii:{digest}]"
 
 
 @dataclass(frozen=True)
 class RedactionRule:
     type: str
     pattern: re.Pattern[str]
-    placeholder: str
 
 
 @lru_cache(maxsize=None)
@@ -37,7 +50,6 @@ def _load_rules_cached(config_path: Path) -> tuple[RedactionRule, ...]:
                 # JSON strings cannot embed inline regex flags; [\s\S] matches any char
                 # including newlines as a portable alternative to re.DOTALL.
                 pattern=re.compile(item["pattern"]),
-                placeholder=item["placeholder"],
             )
         )
     return tuple(rules)
@@ -69,16 +81,17 @@ def _redact_string(
             text = match.group(0)
             if allowlist.matches(text):
                 return text
+            token = _hash_token(text)
             redactions.append(
                 {
                     "field": field,
                     "type": _rule.type,
                     "start": match.start(),
                     "end": match.end(),
-                    "placeholder": _rule.placeholder,
+                    "placeholder": token,
                 }
             )
-            return _rule.placeholder
+            return token
 
         value = rule.pattern.sub(replace, value)
 
@@ -88,16 +101,17 @@ def _redact_string(
             return text
         if shannon_entropy(text) <= 4.5:
             return text
+        token = _hash_token(text)
         redactions.append(
             {
                 "field": field,
                 "type": "high_entropy",
                 "start": match.start(),
                 "end": match.end(),
-                "placeholder": "[REDACTED:high_entropy]",
+                "placeholder": token,
             }
         )
-        return "[REDACTED:high_entropy]"
+        return token
 
     value = TOKEN_RE.sub(replace_high_entropy, value)
     return value, redactions

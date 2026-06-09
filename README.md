@@ -4,7 +4,9 @@
 
 # Kedu · 刻牍
 
-**Local-first, lossless session records for AI coding agents.**
+**English** | [中文](README.zh.md)
+
+**Local-first, lossless session record layer for AI coding agents.**
 
 *Kedu (刻牍, pronounced “Kay-Doo”) means “to inscribe records” — carving down what happened
 so it lasts.*
@@ -12,6 +14,16 @@ so it lasts.*
 Kedu keeps a written history of your development sessions in your project, as plain files
 you own. Any agent — Claude Code, Codex, Kiro, Cursor, or whatever comes next — can pick up
 where the last one left off, instead of relying on memory that's locked inside one tool.
+
+**Kedu is not memory — it's a record layer.** It records *what happened, who did it, where
+the evidence is, and what should happen next*, so agent work becomes auditable and
+handoffable instead of trapped in opaque, vendor-owned recall. Ordinary "memory" answers
+*what the model remembers*; Kedu answers *why we know it, where the proof is, who produced
+it, whether it was verified, and who continues next.*
+
+> Kedu is the clerk of the agent world. It doesn't store the world itself — it records what
+> agents did, where the evidence is, whether the result is trusted, and who should continue
+> next.
 
 <p>
   <a href="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml"><img src="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -56,18 +68,20 @@ kedu init --host claude
 Then, **inside the agent**, take a note and hand it off:
 
 ```text
-/kedu log    what we decided and what should happen next
+/kedu-log    what we decided and what should happen next
 ```
 
 Open a *different* agent in the same project later, and ask it to pick up where you left off:
 
 ```text
-/kedu search    the last decision
+/kedu-search    the last decision
 ```
 
 That's it — the record is a plain file in `.kedu/` and `~/.kedu` that any agent can read.
-See [Using Kedu](#using-kedu) for the per-host command (`/kedu`, or `$kedu` in Codex) and
-[Try it from source](#try-it-from-source) for install details.
+The project `.kedu/` is developer-owned, cross-agent session memory — it travels with the
+repo, not with a vendor. See [Using Kedu](#using-kedu) for the per-host commands
+(`/kedu-log`, `/kedu-search`) and [Try it from source](#try-it-from-source) for install
+details.
 
 ## Why Kedu
 
@@ -95,7 +109,9 @@ guess, not a vendor's black box.
 Treat your agent like a secretary. At the end of a session — or any time something matters —
 you tell it to write down what you did and what you want remembered. That note becomes a
 record in your project. Next time you open the project, the agent reads those records first,
-so it already knows the history and can pick up where you left off.
+so it already knows the history and can pick up where you left off. Like a good clerk, it
+records the moments that matter — what was decided, where the evidence is, what's next — not
+the data itself.
 
 Kedu began as a one-line `/log` skill: it appended a summary of the session to a `history.md`
 file (a per-project copy and a global one), read back at the start of every session. That
@@ -123,8 +139,13 @@ edit or redact anything.
 
 | Kedu is not | In plain terms |
 |---|---|
+| Memory | It doesn't make the model "remember more." It records what was done and where the proof is, so the next agent can verify and continue. |
+| A database | It doesn't hold your bulk data — posts, comments, tables, files. It records *where* that data lives (paths, counts, hashes), not the data itself. |
 | Vector memory / RAG | No embeddings, no fuzzy similarity guessing. It finds records by exact filters and keywords. |
 | A search engine | It surfaces likely-relevant records; the model decides what actually matters. There's no ranking score. |
+| A crawler / connector | It doesn't fetch from the web or platform APIs. It records *that* a fetch happened and points at the output. |
+| A dashboard | It doesn't render or visualize. It's the underlying record other tools can read. |
+| Chat history | Not a transcript dump. Intentional, structured records of decisions, evidence, and next steps. |
 | An agent framework | It doesn't run or steer agents. It records sessions and hands context to whatever agent you use. |
 | Platform memory | Your records are local files you own — not memory held on a vendor's servers. |
 
@@ -137,7 +158,6 @@ What works today, and is covered by the test suite (`uv run pytest`):
 
 - Capturing session records (`kedu log`).
 - Finding past records (`kedu search`, `kedu show`).
-- A per-project "where things stand" summary (`kedu state`).
 - Tidy-up and long-term archiving of old records (`kedu maintain`).
 - Removing secrets from records, including after the fact (`kedu redact`).
 - Wiring Kedu into your agent of choice (`kedu init --host …`) and removing it cleanly
@@ -207,24 +227,23 @@ don't run the raw CLI by hand.
 
 ### 2. Day to day, you talk to the agent
 
-Kedu gives you one command surface:
+Kedu gives you two explicit skills:
 
 ```text
-kedu log                        save a record of this session
-kedu log <what to record>       record something specific you want kept
-kedu search <query>             find past records
-kedu <instruction>              e.g. "remember this decision",
-                                "find the last deployment note"
+/kedu-log                       save a record of this session
+/kedu-log <what to record>      record something specific you want kept
+/kedu-search <query>            find past records
+/kedu-search what's pending     roll up open next steps as a checklist
 ```
 
-How you trigger it depends on the host:
+How you trigger them depends on the host:
 
 | Host | How you call Kedu |
 |---|---|
-| **Claude Code** (CLI & desktop) | `/kedu` — e.g. `/kedu log`, `/kedu search auth cookie` |
-| **Kiro** (CLI & IDE) | `/kedu` as a slash command. In the **IDE** you can also just ask in natural language — `kedu search …`, `kedu log …` — and the always-on steering picks it up. |
-| **Cursor** (CLI & desktop) | `/kedu` |
-| **Codex** (CLI & desktop) | `$kedu` — e.g. `$kedu log`, `$kedu search auth cookie` |
+| **Claude Code** (CLI & desktop) | `/kedu-log`, `/kedu-search` — or just ask in natural language; the skill descriptions trigger discovery |
+| **Kiro** (CLI & IDE) | `/kedu-log`, `/kedu-search` as slash commands, backed by the matching skills. In the **IDE** you can also just ask in natural language — "search Kedu for …", "save a Kedu record" — and the skill picks it up. |
+| **Cursor** (CLI; IDE unverified) | natural-language asks, guided by the `.cursor/rules/kedu.mdc` rule |
+| **Codex** (CLI & desktop) | `$kedu-log`, `$kedu-search` — or natural language |
 
 You're the editor; the agent is the note-taker. When you log, the agent summarizes the
 session (or the thing you pointed at) into a structured record and saves it — you decide what
@@ -246,10 +265,6 @@ kedu search --scope current_project --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
 kedu show '<session-id>:1'
 
-# See where a project stands
-kedu state --project my-project           # print the summary
-kedu rebuild-state --project my-project   # regenerate it
-
 # Maintenance, redaction, and removal (records are never deleted by uninstall)
 kedu maintain --dry-run
 kedu redact --value "secret-value" --reason "leaked in session"
@@ -258,18 +273,23 @@ kedu redact --value "secret-value" --reason "leaked in session"
 kedu uninstall --dry-run                          # preview everything that would be removed
 kedu uninstall --hosts kiro                        # remove just one host (claude|kiro|codex|cursor)
 kedu uninstall --hosts kiro,cursor --project-only  # one or more hosts, project-local files only
+kedu uninstall --no-scan-projects                  # clean only the current project
 kedu uninstall --user-only                         # only user-level install + global host wiring
 ```
 
-`uninstall` scopes by **host** (`--hosts all` or a comma list) and by **location**
-(`--project-only`, `--user-only`, or both when neither is given). Your `long` and `short`
-records are never deleted — only the integration files are.
+By default `uninstall` cleans ALL discovered Kedu-enabled projects under common project
+roots (use `--no-scan-projects` to limit it to the current project). It scopes by **host**
+(`--hosts all` or a comma list) and by **location** (`--project-only`, `--user-only`, or
+both when neither is given), and also removes the runtime lock file `~/.kedu/.kedu.lock`.
+Your `long` and `short` records are never deleted — only the integration files are.
 
 Records anchor to your project root even if the agent runs `kedu log` from a subfolder — see
 [Solution architecture](#solution-architecture) for how that resolution works.
 
 ## Design principles
 
+- **A record layer, not memory** — Kedu captures what happened, who did it, the evidence, and
+  the handoff, so work is auditable, verifiable, and recoverable — not just "remembered."
 - **Local-first by default** — records live in your repo and `~/.kedu`, not a vendor service.
 - **You direct what's recorded** — the agent is your secretary; capture is intentional, never
   silent background memory.
@@ -298,7 +318,7 @@ archive tier by `kedu maintain`. Reads merge all three and deduplicate by `id`.
 
 | Tier | Location | Retention |
 |---|---|---|
-| **short** (hot) | `<project>/.kedu/short.jsonl` | 7-day rolling window, project-local |
+| **short** (hot) | `<project>/.kedu/short.jsonl` | 14-day rolling window, project-local |
 | **long** (durable) | `~/.kedu/long/<project>.jsonl` | All records, shared store |
 | **archive** | `~/.kedu/archive/project=<name>/month=<YYYY-MM>/entries.parquet` | Aged records, DuckDB Parquet |
 
@@ -306,18 +326,16 @@ A local init creates:
 
 ```text
 <project>/.kedu/
-├── short.jsonl     # hot tier: 7-day rolling window
-├── STATE.md        # derived boot view (open items, decisions, entry index)
+├── short.jsonl     # hot tier: 14-day rolling window
 └── config.json     # init marker + canonical project slug
 
 ~/.kedu/
 ├── long/<project>.jsonl                                   # durable tier: all records
 ├── archive/project=<name>/month=<YYYY-MM>/entries.parquet # aged records (DuckDB Parquet)
-├── query_log.jsonl
 └── redaction_log.jsonl
 ```
 
-`kedu maintain` rotates the 7-day hot window and archives durable records older than ~92 days
+`kedu maintain` rotates the 14-day hot window and archives durable records older than ~92 days
 (forced at 31 days if the long file exceeds 50 MB) into Parquet via DuckDB.
 
 ### Record schema
@@ -352,8 +370,7 @@ increments per session.
 agent, tags, time range), then does an exact keyword or regex scan over
 `title + body_md + tags + search_terms + next_steps`. Keyword matching is OR-based per term.
 Results are sorted by timestamp, newest first. There is no embedding model and no relevance
-score — search identifies candidates, and the model decides what matters. Every query is
-appended to `~/.kedu/query_log.jsonl`.
+score — search identifies candidates, and the model decides what matters.
 
 ### Project-root resolution
 
@@ -378,13 +395,33 @@ an allowlist to bypass known-safe values. `kedu redact --value …` performs ret
 redaction, rewriting every JSONL and Parquet tier to replace a literal value and appending an
 audit event to `~/.kedu/redaction_log.jsonl`.
 
+> **Redaction is best-effort.** The regex rules and entropy check catch common credentials,
+> secrets, and regex-detectable PII (emails, phone numbers, API keys, SSNs, etc.), but they
+> are **not** a guarantee. They will miss free-form or ambiguous personal data — especially
+> names, physical addresses, and context-dependent identifiers. The first line of defence is
+> not writing secrets or PII into records in the first place.
+>
+> If you need strict PII detection, you can opt in to an external solution as a pre-processing
+> step before logging:
+>
+> - **Microsoft Presidio** — runs locally; keeps text on your machine and preserves Kedu's
+>   local-first guarantee.
+> - **Cloud DLP/PII APIs** (AWS, Google, Azure) — more capable, but they send your record text
+>   **off the local machine** to a third-party service. That directly conflicts with Kedu's
+>   local-first promise; only use them if your threat model accepts that tradeoff.
+>
+> Kedu does not bundle Presidio or any cloud SDK — these are documentation suggestions only,
+> not dependencies.
+
 ### Host wiring
 
 `kedu init --host <host>` wires Kedu into a project (or user-global location) per host:
-Claude (a marked block in `CLAUDE.md` plus a `/kedu` skill), Codex (a skill under
-`.agents/skills/`), Kiro (steering + agent config under `.kiro/`), and Cursor (a rule under
-`.cursor/rules/`). The host file only tells the agent how to call the `kedu` CLI — records
-are always written by the CLI to the tiers above, never by the skill or rule itself.
+Claude, Codex, and Kiro each get two skills — `kedu-log` and `kedu-search` — under their
+skills directory (`.claude/skills/`, `.agents/skills/`, `.kiro/skills/`); Kiro also gets a
+CLI agent config under `.kiro/`. Cursor gets a single rule under `.cursor/rules/` (the
+Cursor CLI is verified; the Cursor IDE is not). The skills only tell the agent how to call
+the `kedu` CLI — records are always written by the CLI to the tiers above, never by the
+skill or rule itself.
 
 ## License
 

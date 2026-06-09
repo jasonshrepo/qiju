@@ -83,24 +83,27 @@ def test_global_init_for_detected_codex(kedu_env, monkeypatch, tmp_path):
     assert result.mode == "global"
     assert result.host == "codex"
     assert not (kedu_env["project"] / "AGENTS.md").exists()
-    assert (agent_home / ".agents" / "skills" / "kedu" / "SKILL.md").exists()
-    assert (kedu_env["home"] / "agents" / "codex-kedu-skill.md").exists()
+    assert (agent_home / ".agents" / "skills" / "kedu-log" / "SKILL.md").exists()
+    assert (agent_home / ".agents" / "skills" / "kedu-search" / "SKILL.md").exists()
+    assert (kedu_env["home"] / "agents" / "codex-kedu-log-skill.md").exists()
+    assert (kedu_env["home"] / "agents" / "codex-kedu-search-skill.md").exists()
 
 
-def test_global_init_for_claude_installs_skills_and_memory_override(kedu_env, monkeypatch):
+def test_global_init_for_claude_installs_two_skills_no_claude_block(kedu_env, monkeypatch):
     claude_home = kedu_env["project"] / "claude-home"
     monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
     result = init_cmd.init_kedu(mode="global", agent="claude", cwd=kedu_env["project"])
     assert result.mode == "global"
     assert result.host == "claude"
-    assert (claude_home / "CLAUDE.md").exists()
-    skill = claude_home / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
-    assert "/kedu log" in skill.read_text(encoding="utf-8")
-    claude_text = (claude_home / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "memory log" in claude_text
-    assert "obsolete" in claude_text
-    assert "====kedu start ====" in claude_text
+    # Skill-first: no CLAUDE.md block is written on init.
+    assert not (claude_home / "CLAUDE.md").exists()
+    log_skill = claude_home / "skills" / "kedu-log" / "SKILL.md"
+    search_skill = claude_home / "skills" / "kedu-search" / "SKILL.md"
+    assert log_skill.exists()
+    assert search_skill.exists()
+    assert "name: kedu-log" in log_skill.read_text(encoding="utf-8")
+    assert "name: kedu-search" in search_skill.read_text(encoding="utf-8")
+    assert not (claude_home / "skills" / "kedu" / "SKILL.md").exists()
     assert not (claude_home / "settings.json").exists()
 
 
@@ -116,42 +119,28 @@ def test_local_init_for_detected_codex(kedu_env, monkeypatch):
     assert config["kedu_home"] == str(kedu_env["home"])
     assert config["enabled_agents"] == ["codex"]
     assert (project_kedu / "short.jsonl").exists()
-    assert (project_kedu / "STATE.md").exists()
     assert not (kedu_env["project"] / "AGENTS.md").exists()
-    skill = kedu_env["project"] / ".agents" / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
-    assert "kedu" in skill.read_text(encoding="utf-8")
+    log_skill = kedu_env["project"] / ".agents" / "skills" / "kedu-log" / "SKILL.md"
+    search_skill = kedu_env["project"] / ".agents" / "skills" / "kedu-search" / "SKILL.md"
+    assert log_skill.exists()
+    assert search_skill.exists()
+    assert "--agent codex" in log_skill.read_text(encoding="utf-8")
 
 
 def test_local_init_for_claude_installs_project_skills(kedu_env):
     result = init_cmd.init_kedu(mode="local", agent="claude", cwd=kedu_env["project"])
     assert result.host == "claude"
-    assert (kedu_env["project"] / "CLAUDE.md").exists()
+    # Skill-first: init writes NO CLAUDE.md block.
+    assert not (kedu_env["project"] / "CLAUDE.md").exists()
     assert not (kedu_env["project"] / ".claude" / "settings.local.json").exists()
-    skill = kedu_env["project"] / ".claude" / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
-    assert "/kedu search" in skill.read_text(encoding="utf-8")
-    text = (kedu_env["project"] / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "====kedu start ====" in text
-    assert "====kedu stop line:" in text
-
-
-def test_local_init_refreshes_existing_kedu_block(kedu_env):
-    target = kedu_env["project"] / "CLAUDE.md"
-    target.write_text(
-        "Before\n\n<!-- kedu:start -->\nold Kedu block\n<!-- kedu:end -->\n\nAfter\n",
-        encoding="utf-8",
-    )
-
-    init_cmd.init_kedu(mode="local", agent="claude", cwd=kedu_env["project"])
-
-    text = target.read_text(encoding="utf-8")
-    assert "old Kedu block" not in text
-    assert "Legacy naming note" in text
-    assert "<!-- kedu:start -->" not in text
-    assert "====kedu start ====" in text
-    assert "Before" in text
-    assert "After" in text
+    log_skill = kedu_env["project"] / ".claude" / "skills" / "kedu-log" / "SKILL.md"
+    search_skill = kedu_env["project"] / ".claude" / "skills" / "kedu-search" / "SKILL.md"
+    assert log_skill.exists()
+    assert search_skill.exists()
+    assert "--agent claude" in log_skill.read_text(encoding="utf-8")
+    search_text = search_skill.read_text(encoding="utf-8")
+    assert "--format actions" in search_text
+    assert not (kedu_env["project"] / ".claude" / "skills" / "kedu" / "SKILL.md").exists()
 
 
 def test_local_init_preserves_multiple_enabled_agents(kedu_env):
@@ -165,33 +154,36 @@ def test_local_init_preserves_multiple_enabled_agents(kedu_env):
 def test_local_init_supports_agent_override(kedu_env):
     result = init_cmd.init_kedu(mode="local", agent="kiro", cwd=kedu_env["project"])
     assert result.host == "kiro"
-    steering = kedu_env["project"] / ".kiro" / "steering" / "kedu.md"
-    assert steering.exists()
-    steering_text = steering.read_text(encoding="utf-8")
-    assert "`kedu` skill" in steering_text
-    assert "do not answer specific questions from it alone" in steering_text
-    assert "spec = intended plan; Kedu = historical evidence" in steering_text
-    assert "obsolete" in steering_text
-    assert "does not use automatic Kedu hooks" in steering_text
+    # Kiro init is skill-first: no steering file, no saved prompt.
+    assert not (kedu_env["project"] / ".kiro" / "steering" / "kedu.md").exists()
+    assert not (kedu_env["project"] / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
     hook = kedu_env["project"] / ".kiro" / "hooks" / "kedu-clean-exit.kiro.hook"
     assert not hook.exists()
     cli_agent = kedu_env["project"] / ".kiro" / "agents" / "kedu.json"
     assert cli_agent.exists()
     agent_config = json.loads(cli_agent.read_text(encoding="utf-8"))
     assert agent_config["name"] == "kedu"
-    assert "Kedu Session Records" in agent_config["prompt"]
-    assert "memory log" in agent_config["prompt"]
-    assert "does not use automatic Kedu hooks" in agent_config["prompt"]
-    assert "agentStop" not in agent_config["prompt"]
-    assert "scripts/kedu.py" in agent_config["prompt"]
     assert "skill://.kiro/skills/*/SKILL.md" in agent_config["resources"]
-    # The standalone /kedu-agent-prompt saved prompt is retired in favor of the skill.
-    assert not (kedu_env["project"] / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
-    skill = kedu_env["project"] / ".kiro" / "skills" / "kedu" / "SKILL.md"
-    assert skill.exists()
-    skill_text = skill.read_text(encoding="utf-8")
-    assert "name: kedu" in skill_text
-    assert "do not answer specific questions from STATE.md alone" in skill_text
+    prompt = agent_config["prompt"]
+    assert "Kedu Session Records" in prompt
+    assert "memory log" in prompt
+    assert "does not use automatic Kedu hooks" in prompt
+    # No automatic-hook promise and no steering framing.
+    assert "agentStop" not in prompt
+    assert "this steering file" not in prompt
+    assert "inclusion: always" not in prompt
+    # Skill-first: the prompt references both Kedu skills.
+    assert ".kiro/skills/kedu-log/SKILL.md" in prompt
+    assert ".kiro/skills/kedu-search/SKILL.md" in prompt
+    assert "scripts/kedu.py" in prompt
+    log_skill = kedu_env["project"] / ".kiro" / "skills" / "kedu-log" / "SKILL.md"
+    search_skill = kedu_env["project"] / ".kiro" / "skills" / "kedu-search" / "SKILL.md"
+    assert log_skill.exists()
+    assert search_skill.exists()
+    assert "name: kedu-log" in log_skill.read_text(encoding="utf-8")
+    assert "name: kedu-search" in search_skill.read_text(encoding="utf-8")
+    assert "--agent kiro" in log_skill.read_text(encoding="utf-8")
+    assert not (kedu_env["project"] / ".kiro" / "skills" / "kedu" / "SKILL.md").exists()
 
 
 def test_local_init_adds_git_info_exclude(kedu_env):

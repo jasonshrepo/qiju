@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 BIN_DIR="${KEDU_BIN_DIR:-$HOME/.local/bin}"
 KEDU_HOME="${KEDU_HOME:-$HOME/.kedu}"
 INSTALL_ROOT="${KEDU_INSTALL_ROOT:-}"
@@ -49,6 +49,11 @@ die() {
   exit 1
 }
 
+require_arg() {
+  # $1 = option name, $2 = the value (may be unset)
+  [ "$#" -ge 2 ] && [ -n "${2:-}" ] || die "option $1 requires a value"
+}
+
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     printf '[dry-run] %q' "$1"
@@ -82,23 +87,28 @@ fi
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --prefix)
+      require_arg "$1" "${2:-}"
       INSTALL_ROOT="$2"
       shift 2
       ;;
     --bin-dir)
+      require_arg "$1" "${2:-}"
       BIN_DIR="$2"
       shift 2
       ;;
     --kedu-home)
+      require_arg "$1" "${2:-}"
       KEDU_HOME="$2"
       shift 2
       ;;
     --project)
+      require_arg "$1" "${2:-}"
       PROJECT_DIR="$2"
       PROJECT_EXPLICIT=1
       shift 2
       ;;
     --agents)
+      require_arg "$1" "${2:-}"
       AGENTS="$2"
       shift 2
       ;;
@@ -184,6 +194,26 @@ install_file() {
   log "installed: $dst"
 }
 
+clean_install_root() {
+  [ -d "$INSTALL_ROOT" ] || return 0
+  # Guard against deleting the record store: refuse if KEDU_HOME is the install
+  # root or lives inside it. In the default layout INSTALL_ROOT=$KEDU_HOME/kedu,
+  # so the record store under $KEDU_HOME is a SIBLING of the install root and
+  # this guard passes (pruning is safe).
+  case "$KEDU_HOME/" in
+    "$INSTALL_ROOT"/*)
+      die "refusing to reinstall: kedu home ($KEDU_HOME) is inside the engine path ($INSTALL_ROOT); use a separate --prefix or --kedu-home"
+      ;;
+  esac
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "[dry-run] prune $INSTALL_ROOT"
+    return 0
+  fi
+  # Remove every top-level entry except the venv, so files dropped in a newer
+  # version do not linger; keeping .venv keeps uv sync --frozen a fast no-op.
+  find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 ! -name '.venv' -exec rm -rf {} +
+}
+
 copy_project() {
   require_command tar
   log "Installing Kedu $VERSION"
@@ -193,6 +223,7 @@ copy_project() {
     log "[dry-run] copy project files"
     return 0
   fi
+  clean_install_root
   mkdir -p "$INSTALL_ROOT"
   (
     cd "$SOURCE_DIR"
@@ -236,11 +267,9 @@ EOF
 install_shared_store() {
   run mkdir -p "$KEDU_HOME/long" "$KEDU_HOME/archive" "$KEDU_HOME/adapters" "$KEDU_HOME/agents" "$KEDU_HOME/logs"
   install_file "$SOURCE_DIR/adapters/claude_code.sh" "$KEDU_HOME/adapters/claude_code.sh" 0755
-  install_file "$SOURCE_DIR/agents/claude/CLAUDE.kedu.md" "$KEDU_HOME/agents/claude-CLAUDE.kedu.md" 0644
-  install_file "$SOURCE_DIR/skills/kedu/SKILL.md" "$KEDU_HOME/agents/claude-kedu-skill.md" 0644
-  install_file "$SOURCE_DIR/agents/kiro/steering/kedu.md" "$KEDU_HOME/agents/kiro-kedu.md" 0644
+  install_file "$SOURCE_DIR/skills/kedu-log/SKILL.md" "$KEDU_HOME/agents/kedu-log-skill.md" 0644
+  install_file "$SOURCE_DIR/skills/kedu-search/SKILL.md" "$KEDU_HOME/agents/kedu-search-skill.md" 0644
   install_file "$SOURCE_DIR/agents/kiro/agents/kedu.json" "$KEDU_HOME/agents/kiro-kedu-agent.json" 0644
-  install_file "$SOURCE_DIR/agents/kiro/prompts/kedu-agent-prompt.md" "$KEDU_HOME/agents/kiro-kedu-agent-prompt.md" 0644
   install_file "$SOURCE_DIR/agents/cursor/rules/kedu.mdc" "$KEDU_HOME/agents/cursor-kedu.mdc" 0644
 }
 

@@ -6,21 +6,19 @@ import json
 import sys
 
 try:
-    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, paths as paths_mod, retro_redact, schema, search, state
+    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, retro_redact, schema, search
 except ImportError:  # pragma: no cover
     import capture  # type: ignore
     import cleanup as cleanup_mod  # type: ignore
     import init_cmd  # type: ignore
     import maintain as maintain_mod  # type: ignore
-    import paths as paths_mod  # type: ignore
     import retro_redact  # type: ignore
     import schema  # type: ignore
     import search  # type: ignore
-    import state  # type: ignore
 
 
 # Keep in sync with pyproject.toml [project].version
-KEDU_VERSION = "0.1.0"
+KEDU_VERSION = "0.2.0"
 
 
 def _print_json(value) -> None:
@@ -153,7 +151,12 @@ def cmd_search(args: argparse.Namespace) -> int:
             order=args.order,
         )
         fields = _parse_fields(args.fields)
-        if args.format == "table":
+        if args.format == "actions":
+            for text, source in search.rollup_next_steps(results):
+                date = _cell(source.get("ts"))[:10]
+                title = _cell(source.get("title"))
+                print(f'- [ ] {_cell(text)}  (from: {date} "{title}")')
+        elif args.format == "table":
             _print_table(results, fields or ["ts", "id", "title"])
         elif args.format == "jsonl":
             for entry in results:
@@ -179,6 +182,13 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def cmd_redact(args: argparse.Namespace) -> int:
+    if not args.value or not args.value.strip():
+        print(
+            "kedu redact: --value must be a non-empty, non-whitespace string; "
+            "an empty value would corrupt every record",
+            file=sys.stderr,
+        )
+        return 1
     try:
         event = retro_redact.redact_value_everywhere(
             value=args.value,
@@ -235,7 +245,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     try:
         user = not args.project_only
         project_root = None if args.user_only else (args.project_root or ".")
-        scan_projects = bool(args.scan_projects)
+        scan_projects = bool(args.scan_projects) and not args.user_only
         result = cleanup_mod.cleanup(
             user=user,
             project_root=project_root,
@@ -252,31 +262,6 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
         return 0
     except Exception as exc:
         print(f"kedu uninstall: {exc}", file=sys.stderr)
-        return 1
-
-
-def cmd_rebuild_state(args: argparse.Namespace) -> int:
-    try:
-        path = state.rebuild_state(project=args.project)
-        print(path)
-        return 0
-    except Exception as exc:
-        print(f"kedu rebuild-state: {exc}", file=sys.stderr)
-        return 1
-
-
-def cmd_state(args: argparse.Namespace) -> int:
-    try:
-        if args.rebuild:
-            path = state.rebuild_state(project=args.project)
-        else:
-            path = paths_mod.resolve_paths(project=args.project).state_md
-        if not path.exists():
-            path = state.rebuild_state(project=args.project)
-        print(path.read_text(encoding="utf-8"), end="")
-        return 0
-    except Exception as exc:
-        print(f"kedu state: {exc}", file=sys.stderr)
         return 1
 
 
@@ -317,7 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("--fields", help="Comma-separated fields to keep, e.g. title,ts,next_steps")
     search_parser.add_argument("--sort", default="ts", help="Field to sort by (default: ts)")
     search_parser.add_argument("--order", choices=("asc", "desc"), default="desc", help="Sort order (default: desc)")
-    search_parser.add_argument("--format", choices=("json", "jsonl", "summary", "table"), default="json")
+    search_parser.add_argument("--format", choices=("json", "jsonl", "summary", "table", "actions"), default="json")
     search_parser.set_defaults(func=cmd_search)
 
     show_parser = subparsers.add_parser("show", help="Hydrate one Kedu record by id")
@@ -346,21 +331,13 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall_parser.add_argument("--project-root", "--project-path", dest="project_root", help="Project root to clean; defaults to the current directory")
     uninstall_parser.add_argument("--project", help="Project slug override")
     uninstall_parser.add_argument("--hosts", default="all", help="all or comma list: claude,kiro,codex,cursor")
-    uninstall_parser.add_argument("--scan-projects", action="store_true", help="Also scan common project roots and clean all discovered Kedu-enabled projects")
+    uninstall_parser.add_argument("--scan-projects", action=argparse.BooleanOptionalAction, default=True, help="Scan common project roots and clean ALL discovered Kedu-enabled projects (default: on). Use --no-scan-projects to clean only the current project.")
     uninstall_parser.add_argument("--scan-root", action="append", help="Root to scan for Kedu-enabled projects; can be repeated")
     uninstall_parser.add_argument("--scan-depth", type=int, default=cleanup_mod.DEFAULT_SCAN_DEPTH, help="Maximum scan depth for project discovery")
     uninstall_parser.add_argument("--bin-dir", help="Kedu shim directory, default: ~/.local/bin")
     uninstall_parser.add_argument("--install-root", help="Installed Kedu engine path, default: ~/.kedu/kedu")
     uninstall_parser.set_defaults(func=cmd_uninstall)
 
-    state_view_parser = subparsers.add_parser("state", help="Print .kedu/STATE.md")
-    state_view_parser.add_argument("--project")
-    state_view_parser.add_argument("--rebuild", action="store_true", help="Regenerate before printing")
-    state_view_parser.set_defaults(func=cmd_state)
-
-    state_parser = subparsers.add_parser("rebuild-state", help="Regenerate .kedu/STATE.md")
-    state_parser.add_argument("--project")
-    state_parser.set_defaults(func=cmd_rebuild_state)
     return parser
 
 

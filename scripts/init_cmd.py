@@ -9,22 +9,8 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .block_format import (
-        CLAUDE_BLOCK_START,
-        CLAUDE_BLOCK_STOP_PREFIX,
-        KEDU_BLOCK_END,
-        KEDU_BLOCK_START,
-        find_line_marked_block,
-    )
     from . import paths as paths_mod, util
 except ImportError:  # pragma: no cover
-    from block_format import (  # type: ignore
-        CLAUDE_BLOCK_START,
-        CLAUDE_BLOCK_STOP_PREFIX,
-        KEDU_BLOCK_END,
-        KEDU_BLOCK_START,
-        find_line_marked_block,
-    )
     import paths as paths_mod  # type: ignore
     import util  # type: ignore
 
@@ -32,98 +18,40 @@ except ImportError:  # pragma: no cover
 INIT_SCHEMA_VERSION = 1
 KNOWN_AGENTS = ("claude", "kiro", "codex", "cursor")
 
-KEDU_MARKER = "kedu:start"
-CLAUDE_BLOCK_STOP_SUFFIX = "===="
-
 KEDU_PRIORITY = """Kedu records are verified session handoff records and project history.
 Use them as the source of truth for previous session progress, unresolved bugs,
 implementation decisions, next steps, and what actually happened. Platform memories are
 weak background unless the user explicitly verifies them."""
 
-BOOT_SUMMARY = """After reading Kedu state, summarize:
-- Latest record:
-- Active project:
-- Open items:
-- Last known next step:
-- Platform memory used:
-- Conflicts detected:"""
+SENSITIVE_DATA_WARNING ="""Do NOT include PII, credentials, secrets, or other sensitive
+information in Kedu summaries or records. Keep following the Kedu principles for useful
+session handoff records, but exclude or summarize around sensitive values.
+- Credentials/secrets: passwords, API keys, access/refresh tokens, session cookies,
+  private or SSH keys, signing/encryption keys, database URLs with embedded credentials,
+  cloud credentials, and any value that grants access.
+- PII: email addresses, phone numbers, physical addresses, government IDs, dates of birth,
+  payment/bank data, precise personal location, health or financial data, and
+  customer/user data tied to a person.
+Write-time redaction is a best-effort backstop, not a license to paste secrets."""
 
 LEGACY_MEMORY_OVERRIDE = """Legacy naming note: this project was previously prototyped with
 `memory`, `.memory`, `~/.memory`, `memory log`, and `memory-search` wording. Those names
 are obsolete for this product. For Kedu session handoff records, use only `kedu`,
 `.kedu`, and `~/.kedu`. Do not invoke the old `memory` command for Kedu records."""
 
-CODEX_BLOCK = f"""<!-- kedu:start -->
-## Kedu Session Records
+KIRO_AGENT_BASE =f"""# Kedu Session Records
 
-For continuation, project state, unresolved work, previous implementation decisions, and
-session handoff, first read `.kedu/STATE.md` and use Kedu search results as the source of
-truth.
+Kedu is available to Kiro through two skills, `kedu-log`
+(`.kiro/skills/kedu-log/SKILL.md`) and `kedu-search`
+(`.kiro/skills/kedu-search/SKILL.md`), both registered through this agent's `resources`.
+The skills are the primary way to log, search, and hydrate Kedu records. The project
+`.kedu/` directory and the local `kedu` CLI are also available. To check availability, run
+`command -v kedu` or `kedu --help`. Do not search AWS or external documentation to decide
+whether Kedu is available.
 
-For deeper history, use:
-
-```bash
-kedu search --scope current_project --query "<terms>"
-```
-
-When saving a Kedu record from Codex, use:
-
-```bash
-kedu log --source manual --agent codex --project <project> --body <entry-json-file>
-```
-
-{KEDU_PRIORITY}
-
-{LEGACY_MEMORY_OVERRIDE}
-
-{BOOT_SUMMARY}
-
-All agents share `~/.kedu`; `agent` is a record field, not a storage directory.
-<!-- kedu:end -->
-"""
-
-CLAUDE_BLOCK = f"""## Kedu Session Records
-
-For task continuation, project state, unresolved work, previous implementation decisions,
-and session handoff, first read `.kedu/STATE.md` and hydrate relevant records through
-`kedu search`.
-
-```bash
-kedu search --scope current_project --query "<terms>"
-```
-
-When saving a Kedu record from Claude Code, use `/kedu log`, `/kedu search <query>`,
-or `/kedu <specific instruction>` for durable project memory tasks. Direct CLI form:
-
-```bash
-kedu log --source manual --agent claude --project <project> --body <entry-json-file>
-```
-
-{KEDU_PRIORITY}
-
-{LEGACY_MEMORY_OVERRIDE}
-
-{BOOT_SUMMARY}
-
-All agents share `~/.kedu`; `agent` is a record field, not a storage directory.
-"""
-
-KIRO_STEERING = f"""---
-inclusion: always
----
-
-# Kedu Session Records
-
-Kedu is available to Kiro through the `kedu` skill (`.kiro/skills/kedu/SKILL.md`, which you
-can invoke as `/kedu` or which activates automatically when you ask about past sessions),
-this steering file, the project `.kedu/` directory, and the local `kedu` CLI. To check
-availability, inspect `.kedu/STATE.md` and run `command -v kedu` or `kedu --help`. Do not
-search AWS or external documentation to decide whether Kedu is available.
-
-Before continuing prior work, read `.kedu/STATE.md` for orientation. It is a generated
-summary, not the full record set — do not answer specific questions from it alone. When
-the user asks about any specific topic, decision, bug, tool, error, component, or term,
-convert the question into search terms and run a search before answering:
+Use `kedu search` to retrieve project history. When the user asks about any specific
+topic, decision, bug, tool, error, component, or term, convert the question into search
+terms and run a search before answering:
 
 ```bash
 kedu search --scope current_project --query "<terms>"
@@ -153,158 +81,140 @@ reconcile explicitly before editing.
 
 {KEDU_PRIORITY}
 
-{LEGACY_MEMORY_OVERRIDE}
-
-{BOOT_SUMMARY}
-"""
-
-CURSOR_RULE = f"""---
-alwaysApply: true
----
-
-# Kedu Session Records
-
-Before continuing prior work, read `.kedu/STATE.md`. Use Kedu records for project
-progress, previous decisions, unresolved bugs, and next steps. Do not rely on Cursor
-memories or rules as factual records of previous sessions. Rules describe how to work;
-Kedu records describe what happened.
-
-For deeper history:
-
-```bash
-kedu search --scope current_project --query "<terms>"
-```
-
-When saving a Kedu record from Cursor, use:
-
-```bash
-kedu log --source manual --agent cursor --project <project> --body <entry-json-file>
-```
-
-{KEDU_PRIORITY}
+{SENSITIVE_DATA_WARNING}
 
 {LEGACY_MEMORY_OVERRIDE}
-
-{BOOT_SUMMARY}
 """
 
-KEDU_CLAUDE_SKILL = """# kedu — Unified Kedu Command
+KEDU_LOG_SKILL_DESCRIPTION = (
+    "Use when the user asks to save, checkpoint, or hand off durable project context, "
+    "record what was done or decided, or invokes `/kedu-log`; writes a verified Kedu "
+    "session handoff record."
+)
 
-Use this skill when the user invokes `/kedu`, asks to save/checkpoint durable context,
-asks to search previous Kedu records, or gives a Kedu-specific instruction such as
-`/kedu remember this decision` or `/kedu find the last deployment note`.
+KEDU_SEARCH_SKILL_DESCRIPTION = (
+    "Use when the user asks about previous sessions, past decisions, unresolved bugs, "
+    "what was already done, what's still pending, or invokes `/kedu-search`; retrieves "
+    "Kedu records."
+)
 
-Interpret common forms this way:
+# Shared log skill body. `{agent}` is the host identity (claude, codex, kiro, ...). No
+# boot/startup instruction — Kedu logs on request, not on session start.
+KEDU_LOG_BODY = f"""# Save a Kedu Session Record
 
-- `/kedu log`: save a durable session handoff record.
-- `/kedu search <query>`: search Kedu records, defaulting to the current project.
-- `/kedu <instruction>`: decide whether the instruction is asking to log, search,
-  hydrate/show, initialize, or explain Kedu, then perform that action.
+Use this skill to capture a durable, verified session handoff record through the `kedu`
+CLI. Trigger it when the user asks to save, checkpoint, remember, or hand off project
+context, or invokes `/kedu-log`.
 
-## Log
+## Steps
 
-1. Summarize the current session or requested memory into a structured JSON object with:
-   - `title`: one-line summary
-   - `agent`: the current host/agent identity, such as `claude`, `codex`, or `kiro`
-   - `tags`: 3-5 categories
-   - `search_terms`: aliases, service names, error codes, symbols, and useful variants
-   - `next_steps`: actionable remaining items
-   - `body_md`: full human-readable markdown narrative
-2. Write that JSON object to a temporary file inside the workspace when possible, such
-   as `.kedu/kedu-entry.json`.
-3. Run `kedu log --source manual --agent <agent> --project <project> --body <temp-file>`.
-4. Remove the temporary file after a successful log.
+1. Summarize the current session, decision, or requested fact into a single JSON object:
+   - `title`: one-line summary.
+   - `tags`: 3-5 categories.
+   - `search_terms`: aliases, service names, error codes, symbols, and useful variants.
+   - `next_steps`: actionable remaining items.
+   - `body_md`: full human-readable markdown narrative. Do not shorten it to save space —
+     the body is the handoff; storage is negligible.
+2. Write that JSON object to `.kedu/kedu-entry.json` INSIDE the workspace. Never write it
+   to `/tmp` (some hosts reject writes outside the workspace).
+3. Run:
+
+   ```bash
+   kedu log --source manual --agent {{agent}} --project <project> --body .kedu/kedu-entry.json
+   ```
+4. Remove `.kedu/kedu-entry.json` after a successful log.
 5. Report the returned record id.
 
-Do not include secrets. The CLI runs write-time redaction before persistence.
+{SENSITIVE_DATA_WARNING}
 
-## Search
+{KEDU_PRIORITY}
 
-1. Default to `--scope current_project`.
-2. Widen to `--scope all` only when the user asks a cross-project question.
-3. Convert the question into structured filters plus lexical terms.
-4. Add `--agent <agent>` when the user wants records written by a specific agent.
-5. Run `kedu search --scope <scope> --query "<terms>"`.
-6. If results are incomplete, reformulate with aliases and related terms.
-7. Use `kedu show <id>` when you only need to hydrate one candidate.
-
-Kedu search identifies candidates. The model decides relevance for the current turn.
-
-## Initialize
-
-Use `kedu init --host claude` for project-local setup. Use
-`kedu init --host claude --global` or `kedu init --host claude --place global` only when
-the user wants user-level defaults.
+{LEGACY_MEMORY_OVERRIDE}
 """
 
-CODEX_KEDU_SKILL = f"""---
-name: kedu
-description: Use when the user asks to remember durable project facts, retrieve previous project context, search Kedu records, initialize Kedu for a project, or save architecture decisions/preferences into verified session handoff records.
----
+# Shared search skill body — host-independent (no `{agent}` token).
+KEDU_SEARCH_BODY = f"""# Search Kedu Session Records
 
-# Kedu — Verified Session Handoff
+Use this skill to retrieve project history through the `kedu` CLI. Trigger it when the
+user asks about previous sessions, past decisions, unresolved bugs, what was already done,
+what's still pending, or invokes `/kedu-search`.
 
-Use this skill for durable project records backed by the shared `kedu` CLI.
+## Shape output with kedu's own flags
 
-## Initialize
+NEVER pipe `kedu` output through `python`, `jq`, `awk`, or `sed`. `kedu search` already
+emits exactly the shape you need — ask it for that shape:
 
-For project-level setup, run from the project root first:
+- `--fields a,b,c` — keep only these fields, e.g. `--fields title,ts,next_steps`.
+- `--format json|jsonl|summary|table|actions` — pick the rendering. `summary` is one line
+  per record; `table` is columnar; `actions` rolls up open next steps as a checklist.
+- `--ids-only` — return just ids (plus project/title) for a follow-up `kedu show <id>`.
+- `--limit N` — cap the number of results.
+
+Examples:
 
 ```bash
-kedu init --host codex
+kedu search --scope current_project --query "auth cookie" --format summary
+kedu search --scope current_project --fields title,ts --limit 5
+kedu search --scope current_project --ids-only --query "deploy"
 ```
 
-For optional agent-level defaults later:
+## Confirm the time range before a wide search
+
+Infer the query's time span and act accordingly:
+
+- Clearly recent ("yesterday", "this week"): just search.
+- Open-ended ("everything I've worked on") or clearly older than ~14 days (reaching into
+  the long/archive tiers): CONFIRM the intended range with the user before running the
+  wide search, so you don't dump the entire history unasked.
+
+Translate plain time phrases into bounds: "since Monday" → `--since`, "before March" →
+`--until`. Pass ISO dates, e.g. `--since 2026-06-01 --until 2026-06-08`.
+
+## Pending / open action items
+
+When the user asks "what's pending?" or "what are the open action items?", roll up the
+outstanding next steps:
 
 ```bash
-kedu init --host codex --global
+kedu search --scope current_project --format actions
 ```
 
-## Read Kedu
+## Scope
 
-At the start of a project continuation session, read:
-
-```text
-.kedu/STATE.md
-```
-
-For deeper history:
+Default to `--scope current_project`. Widen to `--scope all` only for cross-project
+questions.
 
 ```bash
 kedu search --scope current_project --query "<terms>"
 ```
 
-Use `--scope all` only when the user asks for cross-project records.
-
-## Write Kedu
-
-When saving durable context, summarize the current session or fact into JSON and run:
-
-```bash
-kedu log --source manual --agent codex --project <project> --body <entry-json-file>
-```
-
-Required JSON fields can be minimal because the CLI fills schema metadata:
-
-```json
-{{
-  "title": "One-line summary",
-  "tags": ["architecture", "decision"],
-  "search_terms": ["aliases", "symbols", "error codes"],
-  "next_steps": ["actionable follow-up"],
-  "body_md": "Full markdown Kedu record"
-}}
-```
+Use `kedu show <id>` to hydrate the full body of a candidate record.
 
 {KEDU_PRIORITY}
 
 {LEGACY_MEMORY_OVERRIDE}
-
-{BOOT_SUMMARY}
-
-All agents share `~/.kedu`; there are no per-agent Kedu stores. The record `agent` field
-records who wrote it. The record `source` field records how it was captured.
 """
+
+
+def _skill_md(name: str, description: str, body: str) -> str:
+    """Render a SKILL.md with name+description frontmatter (Claude/Codex/Kiro format)."""
+    return f"---\nname: {name}\ndescription: {description}\n---\n\n{body.strip()}\n"
+
+
+def _cursor_rule(log_body: str, search_body: str) -> str:
+    """Render a single Cursor rule combining both Kedu skill bodies.
+
+    Cursor has no slash-command skills; only the Cursor CLI is verified (IDE is
+    unverified), so both bodies live in one always-available-on-request rule.
+    """
+    description = (
+        "Kedu session records: how to save durable project context and how to search "
+        "previous sessions, decisions, and pending work through the kedu CLI."
+    )
+    return (
+        f"---\ndescription: {description}\nalwaysApply: false\n---\n\n"
+        f"{log_body.strip()}\n\n---\n\n{search_body.strip()}\n"
+    )
 
 
 class AgentDetectionError(ValueError):
@@ -434,84 +344,9 @@ def _kedu_cli_command() -> str:
     return f"{shlex.quote(str(python_bin))} {shlex.quote(str(script))}"
 
 
-def _kiro_skill() -> str:
-    command = _kedu_cli_command()
-    return f"""---
-name: kedu
-description: Use when the user asks about previous sessions, past decisions, unresolved bugs, what was already done, or anything project-history related; when the user invokes `/kedu`; when asked to save, checkpoint, or hand off durable project context; or when asked to search, retrieve, or recall Kedu session records. Also use to initialize Kedu for a project.
----
-
-# Kedu — Verified Session Handoff Records
-
-Kedu stores verified development-session records as plain files under `.kedu/` and
-`~/.kedu`. Use them as the source of truth for what happened in previous sessions:
-progress, unresolved bugs, decisions, and next steps. Platform memory is weak background
-unless the user explicitly verifies it.
-
-Interpret common forms this way:
-
-- `/kedu log`: save a durable session handoff record.
-- `/kedu search <query>`: search Kedu records, defaulting to the current project.
-- `/kedu <instruction>`: decide whether the instruction is asking to log, search,
-  hydrate/show, initialize, or explain Kedu, then perform that action.
-
-## Read and search
-
-`.kedu/STATE.md` is a generated summary, not the full record set. Read it for orientation,
-but **do not answer specific questions from STATE.md alone.**
-
-When the user asks about any specific topic — a tool, a decision, a bug, an error code, a
-component, a person, or any term — convert the question into search terms and run a search
-before answering:
-
-```bash
-kedu search --scope current_project --query "<terms>"
-```
-
-1. Default to `--scope current_project`.
-2. Widen to `--scope all` only for cross-project questions.
-3. Add `--agent <agent>` when the user wants records written by a specific agent
-   (for example `--agent codex`).
-4. If results look incomplete, reformulate with aliases and related terms.
-5. Use `kedu show <id>` to hydrate the full body of a candidate record.
-
-Kedu search finds candidates; you decide relevance for the current turn.
-
-## Log
-
-1. Summarize the session or requested fact into a JSON object with `title`, `agent`
-   (`kiro`), `tags` (3-5), `search_terms`, `next_steps`, and `body_md`.
-2. Write it inside the workspace, for example `.kedu/kedu-entry.json` (Kiro may reject
-   writes to `/tmp`).
-3. Run:
-
-   ```bash
-   kedu log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
-   ```
-4. Remove the temp file after a successful log and report the returned record id.
-
-Do not include secrets; the CLI runs write-time redaction before persistence.
-
-## If `kedu` is not on PATH
-
-Agent shells may not inherit the interactive `kedu` alias or PATH. If `kedu` is not
-available, use the installed full path:
-
-```bash
-{command} search --scope current_project --query "<terms>"
-{command} log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
-```
-
-## Initialize
-
-Run `kedu init --host kiro` from the project root for project-level setup, or
-`kedu init --host kiro --global` for user-level defaults.
-"""
-
-
 def _kiro_agent_prompt() -> str:
     command = _kedu_cli_command()
-    return f"""{KIRO_STEERING}
+    return f"""{KIRO_AGENT_BASE}
 
 ## Kiro CLI Operation
 
@@ -568,67 +403,12 @@ def _kiro_agent_config() -> str:
     ) + "\n"
 
 
-def _line_marked_block(block: str) -> str:
-    body = block.strip("\n")
-    lines = body.splitlines()
-    stop = f"{CLAUDE_BLOCK_STOP_PREFIX}{len(lines)}{CLAUDE_BLOCK_STOP_SUFFIX}"
-    return "\n".join([CLAUDE_BLOCK_START, *lines, stop, ""])
+def _kedu_log_skill(agent: str) -> str:
+    return _skill_md("kedu-log", KEDU_LOG_SKILL_DESCRIPTION, KEDU_LOG_BODY.format(agent=agent))
 
 
-def _append_claude_block(path: Path, block: str) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    block_text = _line_marked_block(block)
-    if path.exists():
-        current = path.read_text(encoding="utf-8")
-        marked = find_line_marked_block(current)
-        if marked:
-            start, end = marked
-            parts = [part for part in (current[:start].rstrip(), block_text.rstrip(), current[end:].lstrip()) if part]
-            updated = "\n\n".join(parts) + "\n"
-        elif KEDU_MARKER in current:
-            start = current.find(KEDU_BLOCK_START)
-            end = current.find(KEDU_BLOCK_END)
-            if start == -1 or end == -1 or end < start:
-                raise ValueError(f"malformed Kedu block in {path}: missing or misordered legacy delimiters")
-            end += len(KEDU_BLOCK_END)
-            parts = [part for part in (current[:start].rstrip(), block_text.rstrip(), current[end:].lstrip()) if part]
-            updated = "\n\n".join(parts) + "\n"
-        else:
-            updated = current.rstrip() + "\n\n" + block_text
-        if updated == current:
-            return False
-        shutil.copy2(path, path.with_name(f"{path.name}.bak.{_timestamp()}"))
-        path.write_text(updated, encoding="utf-8")
-    else:
-        path.write_text(block_text, encoding="utf-8")
-    return True
-
-
-def _append_block(path: Path, block: str) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    block_text = block.rstrip() + "\n"
-    if path.exists():
-        current = path.read_text(encoding="utf-8")
-        if KEDU_MARKER in current:
-            start = current.find(KEDU_BLOCK_START)
-            end = current.find(KEDU_BLOCK_END)
-            if start == -1 or end == -1 or end < start:
-                raise ValueError(f"malformed Kedu block in {path}: missing or misordered legacy delimiters")
-            end += len(KEDU_BLOCK_END)
-            parts = [part for part in (current[:start].rstrip(), block.rstrip(), current[end:].lstrip()) if part]
-            updated = "\n\n".join(parts) + "\n"
-            if updated == current:
-                return False
-            shutil.copy2(path, path.with_name(f"{path.name}.bak.{_timestamp()}"))
-            path.write_text(updated, encoding="utf-8")
-            return True
-        if current.rstrip() + "\n" == block_text:
-            return False
-        shutil.copy2(path, path.with_name(f"{path.name}.bak.{_timestamp()}"))
-        path.write_text(current.rstrip() + "\n\n" + block_text, encoding="utf-8")
-    else:
-        path.write_text(block_text, encoding="utf-8")
-    return True
+def _kedu_search_skill() -> str:
+    return _skill_md("kedu-search", KEDU_SEARCH_SKILL_DESCRIPTION, KEDU_SEARCH_BODY)
 
 
 def ensure_kedu_home() -> list[str]:
@@ -648,46 +428,49 @@ def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
 
     if agent == "claude":
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
+        log_skill = _kedu_log_skill("claude")
+        search_skill = _kedu_search_skill()
         targets = {
-            claude_home / "CLAUDE.md": CLAUDE_BLOCK,
-            claude_home / "skills" / "kedu" / "SKILL.md": KEDU_CLAUDE_SKILL,
-            home / "agents" / "claude-CLAUDE.kedu.md": CLAUDE_BLOCK,
-            home / "agents" / "claude-kedu-skill.md": KEDU_CLAUDE_SKILL,
+            claude_home / "skills" / "kedu-log" / "SKILL.md": log_skill,
+            claude_home / "skills" / "kedu-search" / "SKILL.md": search_skill,
+            home / "agents" / "claude-kedu-log-skill.md": log_skill,
+            home / "agents" / "claude-kedu-search-skill.md": search_skill,
         }
     elif agent == "kiro":
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
         kiro_agent_config = _kiro_agent_config()
-        kiro_skill = _kiro_skill()
+        log_skill = _kedu_log_skill("kiro")
+        search_skill = _kedu_search_skill()
         targets = {
-            kiro_home / "steering" / "kedu.md": KIRO_STEERING,
             kiro_home / "agents" / "kedu.json": kiro_agent_config,
-            kiro_home / "skills" / "kedu" / "SKILL.md": kiro_skill,
-            home / "agents" / "kiro-kedu.md": KIRO_STEERING,
+            kiro_home / "skills" / "kedu-log" / "SKILL.md": log_skill,
+            kiro_home / "skills" / "kedu-search" / "SKILL.md": search_skill,
             home / "agents" / "kiro-kedu-agent.json": kiro_agent_config,
-            home / "agents" / "kiro-kedu-skill.md": kiro_skill,
+            home / "agents" / "kiro-kedu-log-skill.md": log_skill,
+            home / "agents" / "kiro-kedu-search-skill.md": search_skill,
         }
     elif agent == "codex":
         agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
+        log_skill = _kedu_log_skill("codex")
+        search_skill = _kedu_search_skill()
         targets = {
-            agent_home / ".agents" / "skills" / "kedu" / "SKILL.md": CODEX_KEDU_SKILL,
-            home / "agents" / "codex-kedu-skill.md": CODEX_KEDU_SKILL,
+            agent_home / ".agents" / "skills" / "kedu-log" / "SKILL.md": log_skill,
+            agent_home / ".agents" / "skills" / "kedu-search" / "SKILL.md": search_skill,
+            home / "agents" / "codex-kedu-log-skill.md": log_skill,
+            home / "agents" / "codex-kedu-search-skill.md": search_skill,
         }
     elif agent == "cursor":
         cursor_home = Path(os.environ.get("CURSOR_HOME", "~/.cursor")).expanduser()
+        cursor_rule = _cursor_rule(KEDU_LOG_BODY.format(agent="cursor"), KEDU_SEARCH_BODY)
         targets = {
-            cursor_home / "rules" / "kedu.mdc": CURSOR_RULE,
-            home / "agents" / "cursor-kedu.mdc": CURSOR_RULE,
+            cursor_home / "rules" / "kedu.mdc": cursor_rule,
+            home / "agents" / "cursor-kedu.mdc": cursor_rule,
         }
     else:  # pragma: no cover
         raise AgentDetectionError(f"unsupported agent: {agent}")
 
     for path, content in targets.items():
-        if path.name == "CLAUDE.md":
-            _append_claude_block(path, content)
-        elif path.name == "AGENTS.md":
-            _append_block(path, content)
-        else:
-            _write_file(path, content)
+        _write_file(path, content)
         files.append(str(path))
 
     messages.append(f"global {agent} Kedu integration enabled")
@@ -704,35 +487,12 @@ def add_git_info_exclude(project_root: Path) -> str | None:
     return str(exclude)
 
 
-def initial_state(project: str) -> str:
-    return "\n".join(
-        [
-            f"# Kedu State — {project}",
-            f"Generated: {util.utcish_now_iso()}",
-            "",
-            "## Open Items",
-            "_No open items yet._",
-            "",
-            "## Active Decisions",
-            "_No active decisions detected._",
-            "",
-            "## Entry Index",
-            "| Date | Title | Agent | Source | ID |",
-            "|------|-------|-------|--------|----|",
-            "",
-        ]
-    )
-
-
 def init_project_kedu(kedu_paths: paths_mod.KeduPaths, agent: str) -> list[str]:
     paths_mod.ensure_base_dirs(kedu_paths)
     files = [str(kedu_paths.project_kedu_dir)]
     if not kedu_paths.short_jsonl.exists():
         kedu_paths.short_jsonl.write_text("", encoding="utf-8")
         files.append(str(kedu_paths.short_jsonl))
-    if not kedu_paths.state_md.exists():
-        kedu_paths.state_md.write_text(initial_state(kedu_paths.project), encoding="utf-8")
-        files.append(str(kedu_paths.state_md))
 
     config_path = kedu_paths.project_kedu_dir / "config.json"
     now = util.utcish_now_iso()
@@ -773,26 +533,31 @@ def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path 
     messages: list[str] = []
 
     if agent == "claude":
-        target = kedu_paths.project_root / "CLAUDE.md"
-        _append_claude_block(target, CLAUDE_BLOCK)
-        skill = kedu_paths.project_root / ".claude" / "skills" / "kedu" / "SKILL.md"
-        _write_file(skill, KEDU_CLAUDE_SKILL)
-        files.extend([str(target), str(skill)])
+        skills_dir = kedu_paths.project_root / ".claude" / "skills"
+        log_skill = skills_dir / "kedu-log" / "SKILL.md"
+        search_skill = skills_dir / "kedu-search" / "SKILL.md"
+        _write_file(log_skill, _kedu_log_skill("claude"))
+        _write_file(search_skill, _kedu_search_skill())
+        files.extend([str(log_skill), str(search_skill)])
     elif agent == "kiro":
-        steering = kedu_paths.project_root / ".kiro" / "steering" / "kedu.md"
         cli_agent = kedu_paths.project_root / ".kiro" / "agents" / "kedu.json"
-        skill = kedu_paths.project_root / ".kiro" / "skills" / "kedu" / "SKILL.md"
-        _write_file(steering, KIRO_STEERING)
+        skills_dir = kedu_paths.project_root / ".kiro" / "skills"
+        log_skill = skills_dir / "kedu-log" / "SKILL.md"
+        search_skill = skills_dir / "kedu-search" / "SKILL.md"
         _write_file(cli_agent, _kiro_agent_config())
-        _write_file(skill, _kiro_skill())
-        files.extend([str(steering), str(cli_agent), str(skill)])
+        _write_file(log_skill, _kedu_log_skill("kiro"))
+        _write_file(search_skill, _kedu_search_skill())
+        files.extend([str(cli_agent), str(log_skill), str(search_skill)])
     elif agent == "codex":
-        skill = kedu_paths.project_root / ".agents" / "skills" / "kedu" / "SKILL.md"
-        _write_file(skill, CODEX_KEDU_SKILL)
-        files.append(str(skill))
+        skills_dir = kedu_paths.project_root / ".agents" / "skills"
+        log_skill = skills_dir / "kedu-log" / "SKILL.md"
+        search_skill = skills_dir / "kedu-search" / "SKILL.md"
+        _write_file(log_skill, _kedu_log_skill("codex"))
+        _write_file(search_skill, _kedu_search_skill())
+        files.extend([str(log_skill), str(search_skill)])
     elif agent == "cursor":
         target = kedu_paths.project_root / ".cursor" / "rules" / "kedu.mdc"
-        _write_file(target, CURSOR_RULE)
+        _write_file(target, _cursor_rule(KEDU_LOG_BODY.format(agent="cursor"), KEDU_SEARCH_BODY))
         files.append(str(target))
     else:  # pragma: no cover
         raise AgentDetectionError(f"unsupported agent: {agent}")

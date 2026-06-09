@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
     import util  # type: ignore
 
 
-SHORT_WINDOW_DAYS = 7
+SHORT_WINDOW_DAYS = 14
 ARCHIVE_AFTER_DAYS = 92
 SMALL_PARTITION_FLOOR_BYTES = 2 * 1024 * 1024
 FORCE_LONG_FILE_BYTES = 50 * 1024 * 1024
@@ -27,12 +27,21 @@ def _entry_month(entry: dict[str, Any]) -> str:
     return str(entry["ts"])[:7]
 
 
+def _has_valid_ts(entry: dict[str, Any]) -> bool:
+    return util.try_parse_iso(entry.get("ts")) is not None
+
+
 def _entry_size(entry: dict[str, Any]) -> int:
     return len(json.dumps(entry, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
 def _older_than(entry: dict[str, Any], now: datetime, days: int) -> bool:
-    return util.parse_iso(str(entry["ts"])) < now - timedelta(days=days)
+    # An unparseable ts is never treated as "old": such an entry stays in its tier
+    # (not rotated out of short, not eligible for archive) rather than crashing.
+    parsed = util.try_parse_iso(entry.get("ts"))
+    if parsed is None:
+        return False
+    return parsed < now - timedelta(days=days)
 
 
 def rotate_short(kedu_paths: paths_mod.KeduPaths, *, now: datetime, dry_run: bool) -> dict[str, Any]:
@@ -76,6 +85,10 @@ def archive_long_project(
 
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for entry in long_entries:
+        # Entries with an unparseable ts can't be bucketed by month; leave them in the
+        # long tier (never archived) instead of producing a garbage partition or crashing.
+        if not _has_valid_ts(entry):
+            continue
         groups[_entry_month(entry)].append(entry)
 
     archived_ids: set[str] = set()

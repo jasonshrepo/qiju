@@ -1,0 +1,74 @@
+[
+  {
+    "type": "aws_access_key",
+    "pattern": "AKIA[0-9A-Z]{16}"
+  },
+  {
+    "type": "aws_secret_key",
+    "pattern": "(?i)(aws_secret_access_key|secret_access_key|aws_secret_key)\\s*[=:]\\s*[A-Za-z0-9/+=]{40}"
+  },
+  {
+    "type": "private_key",
+    "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----"
+  },
+  {
+    "type": "bearer_token",
+    "pattern": "\\bBearer\\s+[A-Za-z0-9\\-._~+/]{20,}=*"
+  },
+  {
+    "type": "password",
+    "pattern": "(?i)\\bpassword\\s*[=:]\\s*\\S+"
+  },
+  {
+    "type": "email",
+    "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b"
+  },
+  {
+    "type": "account_id",
+    "pattern": "(?i)\\b(aws\\s+account|account[_ -]?id)\\s*[=:]?\\s*\\d{12}\\b"
+  },
+  {
+    "type": "github_token",
+    "pattern": "\\bgh[pousr]_[A-Za-z0-9]{36}\\b"
+  },
+  {
+    "type": "github_fine_grained_pat",
+    "pattern": "\\bgithub_pat_[A-Za-z0-9_]{22,}\\b"
+  },
+  {
+    "type": "slack_token",
+    "pattern": "\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b"
+  },
+  {
+    "type": "google_api_key",
+    "pattern": "\\bAIza[0-9A-Za-z\\-_]{35}\\b"
+  },
+  {
+    "type": "stripe_key",
+    "pattern": "\\b(?:sk|rk)_live_[0-9a-zA-Z]{16,}\\b"
+  },
+  {
+    "type": "openai_anthropic_key",
+    "pattern": "\\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\\b"
+  },
+  {
+    "type": "jwt",
+    "pattern": "\\beyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b"
+  },
+  {
+    "type": "us_phone",
+    "pattern": "\\b(?:\\+?1[ .-]?)?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b"
+  },
+  {
+    "type": "us_ssn",
+    "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  },
+  {
+    "type": "credit_card",
+    "pattern": "\\b(?:\\d[ -]?){13,16}\\b"
+  },
+  {
+    "type": "ipv4",
+    "pattern": "\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b"
+  }
+]

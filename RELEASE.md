@@ -89,7 +89,7 @@ Run in order. Do not skip on a "small" change — the small changes are what dri
 ### F. Post-release sanity
 
 - [ ] `kedu uninstall --dry-run` lists only generated/install files; **never** lists
-      `long/`, `archive/`, `query_log.jsonl`, `redaction_log.jsonl`, or project `.kedu/`
+      `long/`, `archive/`, `redaction_log.jsonl`, or project `.kedu/`
       with records.
 - [ ] On a throwaway project: `kedu uninstall` then confirm records above survived.
 
@@ -104,25 +104,25 @@ Per-agent checks:
 
 1. **Discover** — agent sees the Kedu skill/instructions (CLI: `$`/`/skills` or equivalent;
    desktop: skill appears or boot instruction fires).
-2. **Boot read** — agent reads `.kedu/STATE.md` at session start and can summarize it.
+2. **History read** — agent runs `kedu search` to retrieve project history and can summarize it.
 3. **Log round-trip** — ask the agent to save a Kedu record; confirm a new `id` is returned
    and the entry lands in `<project>/.kedu/short.jsonl` **and** `~/.kedu/long/<project>.jsonl`.
 4. **Search round-trip** — ask the agent to search Kedu; confirm it finds the record just
    logged.
 
-| Agent | Install command | Skill/boot location read | CLI | Desktop/IDE |
+| Agent | Install command | Skill location read | CLI | Desktop/IDE |
 |---|---|---|---|---|
-| **Claude Code** | `kedu init --host claude` (+ `--global`) | `CLAUDE.md` block + `.claude/skills/kedu/` | ☐ | ☐ |
-| **Codex** | `kedu init --host codex` (+ `--global`) | `.agents/skills/kedu/` (repo) + `~/.agents/skills/kedu/` (user) | ☐ | ☐ |
-| **Kiro** | `kedu init --host kiro` | `.kiro/steering/kedu.md` + `.kiro/agents/kedu.json` | ☐ | ☐ |
-| **Cursor** | `kedu init --host cursor` | `.cursor/rules/kedu.mdc` | ☐ | ☐ |
+| **Claude Code** | `kedu init --host claude` (+ `--global`) | `.claude/skills/kedu-log/SKILL.md` + `.claude/skills/kedu-search/SKILL.md` (no `CLAUDE.md` block) | ☐ | ☐ |
+| **Codex** | `kedu init --host codex` (+ `--global`) | `.agents/skills/kedu-log/` + `.agents/skills/kedu-search/` (repo) and `~/.agents/skills/...` (user) | ☐ | ☐ |
+| **Kiro** | `kedu init --host kiro` | `.kiro/skills/kedu-log/SKILL.md` + `.kiro/skills/kedu-search/SKILL.md` + `.kiro/agents/kedu.json` | ☐ | ☐ |
+| **Cursor** | `kedu init --host cursor` | `.cursor/rules/kedu.mdc` (one rule, both bodies; IDE unverified — only Cursor CLI tested) | ☐ | ☐ |
 
 ### Known surface notes (must hold each release)
 
 - **Codex desktop** does not inherit a project CWD the way the CLI does. The **global**
-  install (`~/.agents/skills/kedu/`) is what makes the skill discoverable in desktop. If a
-  project-only install "works in CLI but not desktop," that is expected — verify the global
-  path is present.
+  install (`~/.agents/skills/kedu-log/` + `~/.agents/skills/kedu-search/`) is what makes the
+  skills discoverable in desktop. If a project-only install "works in CLI but not desktop,"
+  that is expected — verify the global paths are present.
 - **Codex skill path** is `.agents/skills/` (repo) and `~/.agents/skills/` (user), per
   https://developers.openai.com/codex/skills — **not** `~/.codex/skills/`.
 - **Kiro** rejects writes to `/tmp`; entry JSON must be written inside the workspace

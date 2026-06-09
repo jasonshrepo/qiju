@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+try:
+    from . import util
+except ImportError:  # pragma: no cover
+    import util  # type: ignore
+
 
 SCHEMA_VERSION = 2
 VALID_SOURCES = ("manual", "agent")
@@ -66,6 +71,12 @@ def validate(entry: dict[str, Any]) -> dict[str, Any]:
     redactions = entry.get("redactions")
     if isinstance(redactions, list) and not all(isinstance(value, dict) for value in redactions):
         errors.append("redactions must contain only objects")
+
+    # A string ts must be a parseable ISO 8601 datetime. (Only check strings so we
+    # don't emit both the type error above and a parse error for the same field.)
+    ts = entry.get("ts")
+    if isinstance(ts, str) and util.try_parse_iso(ts) is None:
+        errors.append("ts must be an ISO 8601 datetime")
 
     if entry.get("schema_version") != SCHEMA_VERSION:
         errors.append(f"schema_version must be {SCHEMA_VERSION}")
