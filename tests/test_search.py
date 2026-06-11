@@ -120,3 +120,75 @@ def test_time_filtered_search_excludes_malformed_ts(kedu_env):
     ids = {entry["id"] for entry in results}
     assert "good:1" in ids
     assert "bad:1" not in ids
+
+
+# ---------------------------------------------------------------------------
+# Case-normalization tests
+# ---------------------------------------------------------------------------
+
+def test_slugify_project_lowercases():
+    from scripts.paths import slugify_project
+    assert slugify_project("MyProject") == "myproject"
+    assert slugify_project("MyProject") == "myproject"
+
+
+def test_slugify_project_separator_and_strip_unchanged():
+    from scripts.paths import slugify_project
+    # Separator collapsing still works after lowercasing.
+    assert slugify_project("My  Project!!") == "my-project"
+    # Leading/trailing separators stripped.
+    assert slugify_project("--hello--") == "hello"
+    # Dots, underscores, hyphens preserved.
+    assert slugify_project("my.proj_v2") == "my.proj_v2"
+
+
+def test_log_with_uppercase_project_stored_as_lowercase(kedu_env, monkeypatch):
+    """Entries logged with a mixed-case project name are stored lowercase."""
+    monkeypatch.setenv("KEDU_HOME", str(kedu_env["home"]))
+    capture.log_entry(
+        sample_entry(id="upper:1", project="MyProject"),
+        source="manual",
+        project="MyProject",
+        cwd=kedu_env["project"],
+    )
+    # The long file must use the lowercase slug.
+    long_file = kedu_env["home"] / "long" / "myproject.jsonl"
+    assert long_file.exists(), "long file should be lowercase"
+
+    entries = util.read_jsonl(long_file)
+    assert len(entries) == 1
+    assert entries[0]["project"] == "myproject"
+
+
+def test_search_finds_entry_logged_with_uppercase_project(kedu_env, monkeypatch):
+    """search_entries with lowercase project finds entries originally logged uppercase."""
+    monkeypatch.setenv("KEDU_HOME", str(kedu_env["home"]))
+    capture.log_entry(
+        sample_entry(id="upper:2", project="MyProject", title="Case test"),
+        source="manual",
+        project="MyProject",
+        cwd=kedu_env["project"],
+    )
+    results = search.search_entries(
+        scope="current_project",
+        project="myproject",
+        cwd=kedu_env["project"],
+    )
+    assert any(e["id"] == "upper:2" for e in results)
+
+
+def test_search_case_insensitive_legacy_entry(kedu_env, monkeypatch):
+    """search_entries finds a legacy entry whose project field is mixed-case."""
+    monkeypatch.setenv("KEDU_HOME", str(kedu_env["home"]))
+    home = kedu_env["home"]
+    long_file = home / "long" / "myproject.jsonl"
+    long_file.parent.mkdir(parents=True, exist_ok=True)
+    # Write a legacy entry directly with mixed-case project field.
+    util.append_jsonl(long_file, sample_entry(id="legacy:1", project="MyProject", title="Legacy"))
+
+    results = search.search_entries(
+        scope="current_project",
+        project="myproject",
+        cwd=kedu_env["project"],
+    )
+    assert any(e["id"] == "legacy:1" for e in results)

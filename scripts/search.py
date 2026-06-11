@@ -103,7 +103,7 @@ def search_entries(
         if entry_id in seen:
             continue
         seen.add(entry_id)
-        if str(entry.get("project", "")) not in projects:
+        if str(entry.get("project", "")).lower() not in projects:
             continue
         if source and entry.get("source") != source:
             continue

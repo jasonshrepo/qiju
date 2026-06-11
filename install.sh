@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 BIN_DIR="${KEDU_BIN_DIR:-$HOME/.local/bin}"
 KEDU_HOME="${KEDU_HOME:-$HOME/.kedu}"
 INSTALL_ROOT="${KEDU_INSTALL_ROOT:-}"

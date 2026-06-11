@@ -157,8 +157,9 @@ no public package-manager release yet.
 What works today, and is covered by the test suite (`uv run pytest`):
 
 - Capturing session records (`kedu log`).
-- Finding past records (`kedu search`, `kedu show`).
+- Finding past records (`kedu search`, `kedu show`) and listing known projects (`kedu projects`).
 - Tidy-up and long-term archiving of old records (`kedu maintain`).
+- One-time normalization of project names in an existing store (`kedu migrate`).
 - Removing secrets from records, including after the fact (`kedu redact`).
 - Wiring Kedu into your agent of choice (`kedu init --host …`) and removing it cleanly
   (`kedu uninstall`) without ever deleting your records.
@@ -264,10 +265,12 @@ kedu log --source manual --agent claude --project my-project --body record.json
 kedu search --scope current_project --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
 kedu show '<session-id>:1'
+kedu projects                                     # list known project slugs
 
 # Maintenance, redaction, and removal (records are never deleted by uninstall)
 kedu maintain --dry-run
 kedu redact --value "secret-value" --reason "leaked in session"
+kedu migrate --dry-run                            # preview project-name normalization (one-time upgrade step)
 
 # Remove the integration — records are always preserved
 kedu uninstall --dry-run                          # preview everything that would be removed
@@ -384,8 +387,10 @@ score — search identifies candidates, and the model decides what matters.
 
 The project slug is read from the init marker, so records stay anchored to the right project
 even when an agent runs `kedu log` from a subdirectory, and the slug is stable across
-directory renames. If none of the above identifies a root and no `--project` is given,
-`kedu log` aborts rather than create a stray identity.
+directory renames. Project names are normalized to one canonical **lowercase** slug at every
+entry point (log, search, storage filenames), so `MyProject` and `myproject` are the same
+project and a casing slip can't fork the history. If none of the above identifies a root and
+no `--project` is given, `kedu log` aborts rather than create a stray identity.
 
 ### Redaction
 

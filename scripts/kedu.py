@@ -6,19 +6,22 @@ import json
 import sys
 
 try:
-    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, retro_redact, schema, search
+    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, storage
 except ImportError:  # pragma: no cover
     import capture  # type: ignore
     import cleanup as cleanup_mod  # type: ignore
     import init_cmd  # type: ignore
     import maintain as maintain_mod  # type: ignore
+    import migrate as migrate_mod  # type: ignore
+    import paths as paths_mod  # type: ignore
     import retro_redact  # type: ignore
     import schema  # type: ignore
     import search  # type: ignore
+    import storage  # type: ignore
 
 
 # Keep in sync with pyproject.toml [project].version
-KEDU_VERSION = "0.2.0"
+KEDU_VERSION = "0.3.0"
 
 
 def _print_json(value) -> None:
@@ -265,6 +268,30 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_migrate(args: argparse.Namespace) -> int:
+    try:
+        report = migrate_mod.migrate_project_names(
+            project=args.project,
+            dry_run=args.dry_run,
+        )
+        _print_json(report)
+        return 0
+    except Exception as exc:
+        print(f"kedu migrate: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_projects(args: argparse.Namespace) -> int:
+    try:
+        projects = storage.all_projects(paths_mod.kedu_home())
+        for project in projects:
+            print(project)
+        return 0
+    except Exception as exc:
+        print(f"kedu projects: {exc}", file=sys.stderr)
+        return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kedu")
     parser.add_argument("--version", action="version", version=f"kedu {KEDU_VERSION}")
@@ -337,6 +364,14 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall_parser.add_argument("--bin-dir", help="Kedu shim directory, default: ~/.local/bin")
     uninstall_parser.add_argument("--install-root", help="Installed Kedu engine path, default: ~/.kedu/kedu")
     uninstall_parser.set_defaults(func=cmd_uninstall)
+
+    migrate_parser = subparsers.add_parser("migrate", help="Normalize project names to lowercase across stored records (one-time migration)")
+    migrate_parser.add_argument("--project", help="Limit migration to one project slug")
+    migrate_parser.add_argument("--dry-run", action="store_true", help="Report planned changes without writing anything")
+    migrate_parser.set_defaults(func=cmd_migrate)
+
+    projects_parser = subparsers.add_parser("projects", help="List known project slugs")
+    projects_parser.set_defaults(func=cmd_projects)
 
     return parser
 

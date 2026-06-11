@@ -76,10 +76,12 @@ def _read_marker_slug(root: Path) -> str | None:
 
 
 def slugify_project(value: str) -> str:
+    # Lowercase is part of the canonical project identity: a casing slip would fork a
+    # project's history into a silently unretrievable shadow set.
     value = value.strip()
     if not value:
         raise ValueError("project name cannot be empty")
-    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-")
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-").lower()
     return slug or "project"
 
 

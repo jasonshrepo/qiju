@@ -49,10 +49,12 @@ def id_locations(kedu_paths: paths_mod.KeduPaths, entry_id: str) -> set[str]:
 
 def all_projects(home: Path | None = None) -> list[str]:
     home = home or paths_mod.kedu_home()
-    projects = {path.stem for path in paths_mod.all_long_files(home)}
+    # Lowercase normalizes pre-migration files so the listing is canonical even before
+    # `kedu migrate` has run; dedup handles the case-insensitive FS single-file scenario.
+    projects = {path.stem.lower() for path in paths_mod.all_long_files(home)}
     archive_dir = home / "archive"
     if archive_dir.exists():
         for path in archive_dir.glob("project=*"):
-            projects.add(path.name.removeprefix("project="))
+            projects.add(path.name.removeprefix("project=").lower())
     return sorted(projects)
 

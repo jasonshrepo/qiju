@@ -4,6 +4,54 @@ All notable changes to Kedu are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and Kedu aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-11
+
+Project names are now case-insensitive: every project name is normalized to one canonical
+lowercase slug at log time and search time. This closes a bug where a casing slip (e.g.
+`MyProject` vs `myproject`) silently forked a project's history into an
+unretrievable shadow set — the log succeeded, but `kedu show` / `kedu search` resolved the
+other identity. A one-time `kedu migrate` normalizes existing stores.
+
+### Added
+- **`kedu projects`** — new subcommand that prints canonical project slugs (one per line),
+  sourced from `storage.all_projects()`. Would have surfaced a duplicate project identity
+  instantly.
+- **`kedu migrate`** — new subcommand (with `--project` and `--dry-run`) that normalizes all
+  project names to lowercase slugs across the long JSONL tier, archive Parquet tier, the
+  current project's short tier, and its `.kedu/config.json` init marker. Idempotent:
+  a second run on an already-normalized store reports no changes.
+- **`scripts/migrate.py`** — backing module for `kedu migrate`; handles the case-insensitive
+  APFS filesystem correctly (detects same-physical-file via `os.path.samefile` and renames
+  in-place rather than writing and unlinking).
+
+### Changed
+- **`slugify_project()` now lowercases the slug.** Mixed-case project names like
+  `MyProject` and `myproject` previously forked into two silent project
+  identities; they now share one canonical lowercase slug (`myproject`). The change
+  applies at log time (via `resolve_paths`) and at search time (via `project_slug` /
+  `_resolve_scope`).
+- **`search_entries` project filter is now case-insensitive.** Legacy un-migrated entries
+  whose `project` field is mixed-case still match a lowercase slug query
+  (`entry["project"].lower() not in projects`), so records are retrievable before and after
+  running `kedu migrate`.
+- **`all_projects()` returns lowercase slugs only.** Long-file stems and archive dir names
+  are lowercased before being added to the result set, so the project listing is canonical
+  and deduplicated even before migration.
+
+### Fixed
+- **Project identity forking on case-insensitive filesystems (macOS APFS).** Records logged
+  with `--project myproject` vs `MyProject` used to fork into two identities;
+  `kedu show` / `kedu search` would resolve one slug while data sat under the other, making
+  records silently unretrievable. Lowercase normalization at all entry points closes the bug.
+
+### Notes on upgrading
+- Run `kedu migrate --dry-run` to preview, then `kedu migrate` once to normalize an existing
+  store: long files and archive partitions are renamed to their lowercase slug and each
+  record's `project` field is rewritten. No records are deleted (entries merge and dedupe by
+  `id` only), and the command is idempotent.
+- Even before migrating, mixed-case records stay retrievable: the search filter matches the
+  stored `project` field case-insensitively.
+
 ## [0.2.0] - 2026-06-09
 
 A large consolidation release: Kedu is reframed as a local-first **record layer** (not
