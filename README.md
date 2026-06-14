@@ -261,10 +261,10 @@ store directly:
 # Save a record (the agent builds the JSON; you can also write it yourself or pipe via stdin)
 kedu log --source manual --agent claude --project my-project --body record.json
 
-# Find records
+# Find records — two-phase: search lists candidate <uuid>:N ids, show hydrates one
 kedu search --scope current_project --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
-kedu show '<session-id>:1'
+kedu show '<session-id>:1'                         # pass the id exactly as search prints it (the ':N' suffix is required)
 kedu projects                                     # list known project slugs
 
 # Maintenance, redaction, and removal (records are never deleted by uninstall)
@@ -369,11 +369,17 @@ increments per session.
 
 ### Deterministic retrieval
 
-`kedu search` loads all tiers for the requested scope, applies structured filters (source,
-agent, tags, time range), then does an exact keyword or regex scan over
-`title + body_md + tags + search_terms + next_steps`. Keyword matching is OR-based per term.
-Results are sorted by timestamp, newest first. There is no embedding model and no relevance
-score — search identifies candidates, and the model decides what matters.
+Retrieval is two-phase. **Phase 1 — `kedu search`** identifies candidates: it loads all
+tiers for the requested scope, applies structured filters (source, agent, tags, time range),
+then does an exact keyword or regex scan over `title + body_md + tags + search_terms +
+next_steps`. Keyword matching is OR-based per term. Results are sorted by timestamp, newest
+first, and printed as `{session-uuid}:{seq}` ids. There is no embedding model and no
+relevance score — search identifies candidates, and the model decides what matters.
+
+**Phase 2 — `kedu show '<uuid>:N'`** hydrates one record's full body by its exact id. Pass
+the id exactly as `kedu search` prints it, including the `:N` suffix; a bare UUID returns
+`record not found` with a hint to add the suffix (the UUID alone denotes a whole session,
+not a single record).
 
 ### Project-root resolution
 

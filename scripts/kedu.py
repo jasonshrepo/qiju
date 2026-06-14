@@ -178,7 +178,19 @@ def cmd_search(args: argparse.Namespace) -> int:
 def cmd_show(args: argparse.Namespace) -> int:
     entry = search.show_entry(args.id, project=args.project)
     if entry is None:
-        print(f"kedu show: record not found: {args.id}", file=sys.stderr)
+        if ":" not in args.id:
+            print(
+                f"kedu show: record not found: {args.id}\n"
+                f"  Hint: ids carry a :N suffix (e.g. {args.id}:1). "
+                f"Run 'kedu search' to find the exact id.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"kedu show: record not found: {args.id}\n"
+                f"  Hint: Run 'kedu search' to find the exact id.",
+                file=sys.stderr,
+            )
         return 1
     _print_json(_project_entry(entry, _parse_fields(args.fields)))
     return 0

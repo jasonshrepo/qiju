@@ -57,7 +57,20 @@ terms and run a search before answering:
 kedu search --scope current_project --query "<terms>"
 ```
 
-Use `kedu show <id>` to hydrate the full body of a candidate record.
+## Two-phase retrieval
+
+`kedu search` = Phase 1: candidate identification — it finds records and prints ids in
+`<uuid>:N` form. Use `--ids-only` or `--format summary` for a cheap candidate manifest.
+
+`kedu show <uuid>:N` = Phase 2: hydrate — fetches the full body of the chosen record.
+
+**id-format rule:** ids are always `<uuid>:N`. Pass the id to `kedu show` EXACTLY as
+`kedu search` prints it, INCLUDING the `:N` suffix. A bare UUID (no `:N`) returns
+'record not found'.
+
+**bare-UUID routing:** if you only hold a bare UUID (e.g. copied from a record-body
+cross-reference), do NOT call `kedu show` with it — run `kedu search` first to recover
+the full `<uuid>:N` id. Never strip or guess `:N`.
 
 When saving a Kedu record from Kiro, use:
 
@@ -188,7 +201,28 @@ questions.
 kedu search --scope current_project --query "<terms>"
 ```
 
-Use `kedu show <id>` to hydrate the full body of a candidate record.
+## Two-phase retrieval
+
+`kedu search` = **Phase 1: candidate identification.** Finds records and prints ids in
+`<uuid>:N` form. Use `--ids-only` or `--format summary` for a cheap candidate manifest:
+
+```bash
+kedu search --scope current_project --query "deploy" --ids-only   # Phase 1: candidate ids
+```
+
+`kedu show <uuid>:N` = **Phase 2: hydrate.** Fetches the full body of the chosen record:
+
+```bash
+kedu show "<uuid>:N"   # Phase 2: hydrate one record
+```
+
+**id-format rule:** ids are always `<uuid>:N`. Pass the id to `kedu show` EXACTLY as
+`kedu search` prints it, INCLUDING the `:N` suffix. A bare UUID (no `:N`) returns
+'record not found'.
+
+**bare-UUID routing:** if you only hold a bare UUID (e.g. copied from a record-body
+cross-reference), do NOT call `kedu show` with it — run `kedu search` first to recover
+the full `<uuid>:N` id. Never strip or guess `:N`.
 
 {KEDU_PRIORITY}
 

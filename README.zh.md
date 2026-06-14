@@ -237,10 +237,10 @@ agent 最终调用的是 `kedu` CLI，你也可以——用于自动化或直接
 # 保存一条记录（agent 会构造 JSON；你也可以自己写或通过 stdin 传入）
 kedu log --source manual --agent claude --project my-project --body record.json
 
-# 查找记录
+# 查找记录——两阶段：search 列出候选的 <uuid>:N id，show 再水合其中一条
 kedu search --scope current_project --query "auth cookie"
 kedu search --scope all --tags security --since 2026-01-01
-kedu show '<session-id>:1'
+kedu show '<session-id>:1'                         # id 必须与 search 打印的完全一致（':N' 后缀必填）
 kedu projects                                     # 列出已知项目 slug
 
 # 维护、脱敏与移除（uninstall 永不删除记录）
@@ -336,10 +336,15 @@ UUID 取自第一个被设置的 `KEDU_SESSION_ID` / `CLAUDE_SESSION_ID` / `CODE
 
 ### 确定性检索
 
-`kedu search` 加载所请求范围的所有分层，应用结构化过滤（source、agent、tags、时间范围），再在
-`title + body_md + tags + search_terms + next_steps` 上做精确关键词或正则扫描。关键词匹配按
-词项 OR。结果按时间戳排序，最新在前。没有 embedding 模型，也没有相关性打分——搜索找出候选，由
-模型决定什么重要。
+检索分两阶段。**第一阶段——`kedu search`** 负责找出候选：加载所请求范围的所有分层，应用结构化
+过滤（source、agent、tags、时间范围），再在 `title + body_md + tags + search_terms +
+next_steps` 上做精确关键词或正则扫描。关键词匹配按词项 OR。结果按时间戳排序，最新在前，并以
+`{session-uuid}:{seq}` 形式的 id 打印。没有 embedding 模型，也没有相关性打分——搜索找出候选，
+由模型决定什么重要。
+
+**第二阶段——`kedu show '<uuid>:N'`** 按精确 id 水合出某条记录的完整正文。传入的 id 必须与
+`kedu search` 打印的完全一致，包含 `:N` 后缀；只传裸 UUID 会返回 `record not found`，并提示补上
+后缀（裸 UUID 表示的是整个 session，而非单条记录）。
 
 ### 项目根解析
 

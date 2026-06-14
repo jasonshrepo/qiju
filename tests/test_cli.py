@@ -63,6 +63,16 @@ def test_show_cli_accepts_fields():
     assert args.fields == "title,next_steps"
 
 
+def test_show_bare_uuid_not_found_message(kedu_env, capsys):
+    # A bare UUID (no :N suffix) should produce a helpful error pointing to :N and kedu search.
+    args = kedu.build_parser().parse_args(["show", "abcdef12"])
+    rc = kedu.cmd_show(args)
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert ":N" in err or ":1" in err
+    assert "kedu search" in err
+
+
 def test_parse_fields_splits_and_trims():
     assert kedu._parse_fields("title, ts , next_steps") == ["title", "ts", "next_steps"]
     assert kedu._parse_fields("") is None
