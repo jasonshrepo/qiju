@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import kedu as kedu_mod, migrate as migrate_mod, search, util
+from scripts import qiju as qiju_mod, migrate as migrate_mod, search, util
 from tests.conftest import sample_entry
 
 
@@ -26,14 +26,14 @@ def _write_legacy_long(home: Path, filename: str, entries: list[dict]) -> Path:
 
 
 def _write_marker(root: Path, project_name: str) -> None:
-    kedu_dir = root / ".kedu"
-    kedu_dir.mkdir(parents=True, exist_ok=True)
-    marker = kedu_dir / "config.json"
+    qiju_dir = root / ".qiju"
+    qiju_dir.mkdir(parents=True, exist_ok=True)
+    marker = qiju_dir / "config.json"
     marker.write_text(json.dumps({"project": project_name}), encoding="utf-8")
 
 
 def _write_short(root: Path, entries: list[dict]) -> Path:
-    short = root / ".kedu" / "short.jsonl"
+    short = root / ".qiju" / "short.jsonl"
     short.parent.mkdir(parents=True, exist_ok=True)
     for entry in entries:
         util.append_jsonl(short, entry)
@@ -73,10 +73,10 @@ class TestLongTierMigration:
         )
 
     def test_dry_run_reports_actions_without_writing(self, tmp_path, monkeypatch):
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         self._setup_legacy_store(home, project_root)
 
@@ -95,10 +95,10 @@ class TestLongTierMigration:
         assert long_file_before.stat().st_mtime == mtime_before
 
     def test_migration_renames_and_rewrites_entries(self, tmp_path, monkeypatch):
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         self._setup_legacy_store(home, project_root)
 
@@ -122,22 +122,22 @@ class TestLongTierMigration:
             assert entry["project"] == "legacyproj"
 
         # Marker must be updated.
-        marker = project_root / ".kedu" / "config.json"
+        marker = project_root / ".qiju" / "config.json"
         data = json.loads(marker.read_text(encoding="utf-8"))
         assert data["project"] == "legacyproj"
 
         # Short tier must be updated.
-        short_entries = util.read_jsonl(project_root / ".kedu" / "short.jsonl")
+        short_entries = util.read_jsonl(project_root / ".qiju" / "short.jsonl")
         assert len(short_entries) == 2
         for entry in short_entries:
             assert entry["project"] == "legacyproj"
 
     def test_no_entry_loss(self, tmp_path, monkeypatch):
         """Total entry count is preserved (no duplicates dropped unless same id)."""
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         _write_legacy_long(
             home,
@@ -168,10 +168,10 @@ class TestLongTierMigration:
 
     def test_idempotent_second_run(self, tmp_path, monkeypatch):
         """A second migration run produces no changes."""
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         self._setup_legacy_store(home, project_root)
 
@@ -201,10 +201,10 @@ class TestLongTierMigration:
 
     def test_search_finds_legacy_entries_after_migration(self, tmp_path, monkeypatch):
         """After migration, search_entries returns legacy entries by lowercase slug."""
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         self._setup_legacy_store(home, project_root)
 
@@ -239,10 +239,10 @@ class TestArchiveTierMigration:
 
         from scripts import archive as archive_mod
 
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         # Write a legacy archive dir with a mixed-case name.
         archive_dir = home / "archive" / "project=LegacyProj" / "month=2026-01"
@@ -282,10 +282,10 @@ class TestArchiveTierMigration:
 
         from scripts import archive as archive_mod
 
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         archive_dir = home / "archive" / "project=LegacyProj" / "month=2026-01"
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -313,8 +313,8 @@ class TestArchiveTierMigration:
 
 class TestCLIIntegration:
     def test_projects_command_lists_slugs(self, tmp_path, monkeypatch, capsys):
-        home = tmp_path / "kedu-home"
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        home = tmp_path / "qiju-home"
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         # Create two long files (one already lowercase, one mixed-case — same physical file
         # on APFS, so just one).
@@ -322,17 +322,17 @@ class TestCLIIntegration:
         util.append_jsonl(home / "long" / "alpha.jsonl", sample_entry(id="a:1", project="alpha"))
         util.append_jsonl(home / "long" / "beta.jsonl", sample_entry(id="b:1", project="beta"))
 
-        rc = kedu_mod.main(["projects"])
+        rc = qiju_mod.main(["projects"])
         assert rc == 0
         out = capsys.readouterr().out.strip().splitlines()
         assert "alpha" in out
         assert "beta" in out
 
     def test_migrate_dry_run_cli(self, tmp_path, monkeypatch, capsys):
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         _write_legacy_long(
             home,
@@ -342,7 +342,7 @@ class TestCLIIntegration:
         _write_marker(project_root, "LegacyProj")
 
         # Run via CLI main() with dry-run.
-        rc = kedu_mod.main([
+        rc = qiju_mod.main([
             "migrate",
             "--project", "LegacyProj",
             "--dry-run",
@@ -361,10 +361,10 @@ class TestCLIIntegration:
         )
 
     def test_migrate_cli_runs_successfully(self, tmp_path, monkeypatch, capsys):
-        home = tmp_path / "kedu-home"
+        home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
         project_root.mkdir()
-        monkeypatch.setenv("KEDU_HOME", str(home))
+        monkeypatch.setenv("QIJU_HOME", str(home))
 
         _write_legacy_long(
             home,
@@ -373,7 +373,7 @@ class TestCLIIntegration:
         )
         _write_marker(project_root, "LegacyProj")
 
-        rc = kedu_mod.main([
+        rc = qiju_mod.main([
             "migrate",
             "--project", "LegacyProj",
         ])

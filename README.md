@@ -1,32 +1,33 @@
 <div align="center">
-  <img src="assets/logo.svg" alt="Kedu" width="440">
+  <img src="assets/logo.svg" alt="QiJu" width="440">
 </div>
 
-# Kedu · 刻牍
+# QiJu · 起居
 
 **English** | [中文](README.zh.md)
 
 **Local-first, lossless session record layer for AI coding agents.**
 
-*Kedu (刻牍, pronounced “Kay-Doo”) means “to inscribe records” — carving down what happened
-so it lasts.*
+*QiJu (起居, pronounced “CHEE-joo”) takes its name from the court diarists of imperial
+China — the officials who recorded what the ruler said, did, and decided, so there would
+be a faithful record for those who came after.*
 
-Kedu keeps a written history of your development sessions in your project, as plain files
+QiJu keeps a written history of your development sessions in your project, as plain files
 you own. Any agent — Claude Code, Codex, Kiro, Cursor, or whatever comes next — can pick up
 where the last one left off, instead of relying on memory that's locked inside one tool.
 
-**Kedu is not memory — it's a record layer.** It records *what happened, who did it, where
+**QiJu is not memory — it's a record layer.** It records *what happened, who did it, where
 the evidence is, and what should happen next*, so agent work becomes auditable and
 handoffable instead of trapped in opaque, vendor-owned recall. Ordinary "memory" answers
-*what the model remembers*; Kedu answers *why we know it, where the proof is, who produced
+*what the model remembers*; QiJu answers *why we know it, where the proof is, who produced
 it, whether it was verified, and who continues next.*
 
-> Kedu is the clerk of the agent world. It doesn't store the world itself — it records what
+> QiJu is the clerk of the agent world. It doesn't store the world itself — it records what
 > agents did, where the evidence is, whether the result is trusted, and who should continue
 > next.
 
 <p>
-  <a href="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml"><img src="https://github.com/jasonshrepo/kedu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jasonshrepo/qiju/actions/workflows/ci.yml"><img src="https://github.com/jasonshrepo/qiju/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-17313C.svg" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-216C83.svg" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-475A60.svg" alt="Platform: macOS | Linux">
@@ -38,17 +39,42 @@ it, whether it was verified, and who continues next.*
 ## Contents
 
 - [Try it in 5 minutes](#try-it-in-5-minutes)
-- [Why Kedu](#why-kedu)
+- [The name: QiJu (起居)](#the-name-qiju-起居)
+- [Why QiJu](#why-qiju)
 - [The idea](#the-idea)
-- [What Kedu does](#what-kedu-does)
-- [What Kedu is not](#what-kedu-is-not)
+- [What QiJu does](#what-qiju-does)
+- [What QiJu is not](#what-qiju-is-not)
 - [Current status](#current-status)
 - [Known limits](#known-limits)
 - [Try it from source](#try-it-from-source)
-- [Using Kedu](#using-kedu)
+- [Using QiJu](#using-qiju)
 - [Design principles](#design-principles)
 - [Solution architecture](#solution-architecture)
 - [License](#license)
+
+## The name: QiJu (起居)
+
+QiJu (起居, pronounced *CHEE-joo*) takes its name from the **court diarists of imperial
+China** — the *qiju lang*, officials entrusted with recording the ruler's words, actions,
+and daily affairs. Day after day they kept the *Qijuzhu* (起居注, the "Diary of Activity and
+Repose"), the firsthand record that later historians relied on to compile the veritable
+records and the official histories. The diarist did not govern and did not decide — the
+diarist kept a faithful, verifiable account, so that those who came after could know what
+truly happened, and why.
+
+That is exactly this project's role. Swap "ruler" for "agent" and the job description is
+the same:
+
+| The court diarist · 起居郎 | QiJu (起居) |
+| --- | --- |
+| Recorded the ruler's words and acts | Records the decisions and steps in an agent session |
+| Did not rule in the ruler's place | Does not act in the agent's place |
+| Preserved evidence for the historical record | Preserves a verifiable session record |
+| Supplied material for those who later wrote history | Hands off context to the next agent |
+| Kept formal archives | Stores plain JSONL / Markdown / Parquet you own |
+| Chose what was worth recording | Captures intentionally — never silent background memory |
+
+> The agent does the work. QiJu keeps the record.
 
 ## Try it in 5 minutes
 
@@ -56,34 +82,34 @@ The whole loop — install, wire it into an agent, save a record, and have the *
 read it back:
 
 ```bash
-# 1. Install from source (adds `kedu` to ~/.local/bin, engine to ~/.kedu/kedu)
-git clone https://github.com/jasonshrepo/kedu.git
-cd kedu && bash install.sh
+# 1. Install from source (adds `qiju` to ~/.local/bin, engine to ~/.qiju/qiju)
+git clone https://github.com/jasonshrepo/qiju.git
+cd qiju && bash install.sh
 
 # 2. Wire it into a real project (pick your host: claude | codex | kiro | cursor)
 cd /path/to/your/project
-kedu init --host claude
+qiju init --host claude
 ```
 
 Then, **inside the agent**, take a note and hand it off:
 
 ```text
-/kedu-log    what we decided and what should happen next
+/qiju-log    what we decided and what should happen next
 ```
 
 Open a *different* agent in the same project later, and ask it to pick up where you left off:
 
 ```text
-/kedu-search    the last decision
+/qiju-search    the last decision
 ```
 
-That's it — the record is a plain file in `.kedu/` and `~/.kedu` that any agent can read.
-The project `.kedu/` is developer-owned, cross-agent session memory — it travels with the
-repo, not with a vendor. See [Using Kedu](#using-kedu) for the per-host commands
-(`/kedu-log`, `/kedu-search`) and [Try it from source](#try-it-from-source) for install
+That's it — the record is a plain file in `.qiju/` and `~/.qiju` that any agent can read.
+The project `.qiju/` is developer-owned, cross-agent session memory — it travels with the
+repo, not with a vendor. See [Using QiJu](#using-qiju) for the per-host commands
+(`/qiju-log`, `/qiju-search`, `/qiju-review`) and [Try it from source](#try-it-from-source) for install
 details.
 
-## Why Kedu
+## Why QiJu
 
 Getting an AI coding agent genuinely useful on a real project takes effort. You explain the
 architecture, the decisions, the dead ends, what's half-finished. Then the session ends —
@@ -100,7 +126,7 @@ Today that hard-won context gets trapped:
 - **It gets summarized away.** Long sessions are compacted into lossy recaps, and the detail
   you actually needed is the first thing dropped.
 
-Kedu fixes this by keeping project history where it belongs: **in your project, as plain
+QiJu fixes this by keeping project history where it belongs: **in your project, as plain
 files you own.** The next agent reads the same written record of what happened — not a
 guess, not a vendor's black box.
 
@@ -113,19 +139,19 @@ so it already knows the history and can pick up where you left off. Like a good 
 records the moments that matter — what was decided, where the evidence is, what's next — not
 the data itself.
 
-Kedu began as a one-line `/log` skill: it appended a summary of the session to a `history.md`
+QiJu began as a one-line `/log` skill: it appended a summary of the session to a `history.md`
 file (a per-project copy and a global one), read back at the start of every session. That
-worked — until the history grew too big to re-read every time. Kedu is that same idea,
+worked — until the history grew too big to re-read every time. QiJu is that same idea,
 structured so it scales: many small records instead of one growing file, a short summary to
 read on start, and deterministic search to pull only what's relevant.
 
-## What Kedu does
+## What QiJu does
 
 You direct the agent; it takes the notes:
 
 1. **Capture** — you ask the agent to write down what you did and what's worth remembering.
    Record a whole session, or point at the specific things you want kept.
-2. **Preserve** — the agent writes the note; Kedu stores it exactly and never re-summarizes
+2. **Preserve** — the agent writes the note; QiJu stores it exactly and never re-summarizes
    or evicts it the way a context window does.
 3. **Retrieve** — pull the relevant past records when you need them.
 4. **Hand off** — the next agent or session reads those records first.
@@ -135,9 +161,9 @@ Nothing is logged silently in the background — **you decide what gets recorded
 are just files in your repository and home directory: open them, read them, diff them in git,
 edit or redact anything.
 
-## What Kedu is not
+## What QiJu is not
 
-| Kedu is not | In plain terms |
+| QiJu is not | In plain terms |
 |---|---|
 | Memory | It doesn't make the model "remember more." It records what was done and where the proof is, so the next agent can verify and continue. |
 | A database | It doesn't hold your bulk data — posts, comments, tables, files. It records *where* that data lives (paths, counts, hashes), not the data itself. |
@@ -151,30 +177,30 @@ edit or redact anything.
 
 ## Current status
 
-Kedu is a **source-first developer preview**. You install it from this repository; there is
+QiJu is a **source-first developer preview**. You install it from this repository; there is
 no public package-manager release yet.
 
 What works today, and is covered by the test suite (`uv run pytest`):
 
-- Capturing session records (`kedu log`).
-- Finding past records (`kedu search`, `kedu show`) and listing known projects (`kedu projects`).
-- Tidy-up and long-term archiving of old records (`kedu maintain`).
-- One-time normalization of project names in an existing store (`kedu migrate`).
-- Removing secrets from records, including after the fact (`kedu redact`).
-- Wiring Kedu into your agent of choice (`kedu init --host …`) and removing it cleanly
-  (`kedu uninstall`) without ever deleting your records.
+- Capturing session records (`qiju log`).
+- Finding past records (`qiju search`, `qiju show`) and listing known projects (`qiju projects`).
+- Tidy-up and long-term archiving of old records (`qiju maintain`).
+- One-time normalization of project names in an existing store (`qiju migrate`).
+- Removing secrets from records, including after the fact (`qiju redact`).
+- Wiring QiJu into your agent of choice (`qiju init --host …`) and removing it cleanly
+  (`qiju uninstall`) without ever deleting your records.
 
 ## Known limits
 
-Kedu is deliberately small, and this is an early preview. Be aware that:
+QiJu is deliberately small, and this is an early preview. Be aware that:
 
 - **Source-first install only.** You install from this repo with `bash install.sh`. There is
-  no `pip install kedu`, `brew install kedu`, or `npm install -g kedu` yet.
+  no `pip install qiju`, `brew install qiju`, or `npm install -g qiju` yet.
 - **Deterministic retrieval, not semantic search.** Search matches exact keywords, tags, and
   regex — there are no embeddings, vector similarity, or relevance ranking. The model judges
-  relevance after Kedu returns candidates.
+  relevance after QiJu returns candidates.
 - **Intentional capture only.** Nothing is logged silently in the background. You (or the
-  agent, on your instruction) decide what gets recorded; Kedu does not auto-ingest
+  agent, on your instruction) decide what gets recorded; QiJu does not auto-ingest
   transcripts, prompts, or tool calls.
 - **macOS and Linux only.** Windows is not supported or tested.
 - **Developer preview.** Record formats, the CLI surface, and host wiring may still change
@@ -182,14 +208,14 @@ Kedu is deliberately small, and this is an early preview. Be aware that:
 
 ## Try it from source
 
-> Source-first only for now. There is no `npm install -g kedu`, `brew install kedu`, or
-> `pip install kedu` yet.
+> Source-first only for now. There is no `npm install -g qiju`, `brew install qiju`, or
+> `pip install qiju` yet.
 
 ```bash
-git clone https://github.com/jasonshrepo/kedu.git
-cd kedu
+git clone https://github.com/jasonshrepo/qiju.git
+cd qiju
 
-# Installs the `kedu` command (to ~/.local/bin) and an engine copy (to ~/.kedu/kedu)
+# Installs the `qiju` command (to ~/.local/bin) and an engine copy (to ~/.qiju/qiju)
 bash install.sh
 
 # Optional: macOS scheduled maintenance
@@ -199,19 +225,19 @@ bash install.sh --install-launchd
 Make sure `~/.local/bin` is on your `PATH`, then check it's working:
 
 ```bash
-kedu --help
+qiju --help
 ```
 
-Records are stored under `~/.kedu` by default. Override with `export KEDU_HOME=/path/to/store`.
+Records are stored under `~/.qiju` by default. Override with `export QIJU_HOME=/path/to/store`.
 
-**Working on Kedu itself:**
+**Working on QiJu itself:**
 
 ```bash
 uv sync          # install dependencies (Python >=3.11)
 uv run pytest    # run the test suite
 ```
 
-## Using Kedu
+## Using QiJu
 
 ### 1. Connect a project to your agent (one-time setup)
 
@@ -219,84 +245,85 @@ Run this yourself in a terminal, once per project:
 
 ```bash
 cd /path/to/project
-kedu init --host claude        # or: codex | kiro | cursor
-kedu init --host claude --global   # optional user-level defaults
+qiju init --host claude        # or: codex | kiro | cursor
+qiju init --host claude --global   # optional user-level defaults
 ```
 
-This wires the `kedu` command into your agent. From then on, you work through the agent — you
+This wires the `qiju` command into your agent. From then on, you work through the agent — you
 don't run the raw CLI by hand.
 
 ### 2. Day to day, you talk to the agent
 
-Kedu gives you two explicit skills:
+QiJu gives you three explicit skills:
 
 ```text
-/kedu-log                       save a record of this session
-/kedu-log <what to record>      record something specific you want kept
-/kedu-search <query>            find past records
-/kedu-search what's pending     roll up open next steps as a checklist
+/qiju-log                       save a record of this session
+/qiju-log <what to record>      record something specific you want kept
+/qiju-search <query>            find past records
+/qiju-search what's pending     roll up open next steps as a checklist
+/qiju-review                    review recent records for lessons and prompt improvements
 ```
 
 How you trigger them depends on the host:
 
-| Host | How you call Kedu |
+| Host | How you call QiJu |
 |---|---|
-| **Claude Code** (CLI & desktop) | `/kedu-log`, `/kedu-search` — or just ask in natural language; the skill descriptions trigger discovery |
-| **Kiro** (CLI & IDE) | `/kedu-log`, `/kedu-search` as slash commands, backed by the matching skills. In the **IDE** you can also just ask in natural language — "search Kedu for …", "save a Kedu record" — and the skill picks it up. |
-| **Cursor** (CLI; IDE unverified) | natural-language asks, guided by the `.cursor/rules/kedu.mdc` rule |
-| **Codex** (CLI & desktop) | `$kedu-log`, `$kedu-search` — or natural language |
+| **Claude Code** (CLI & desktop) | `/qiju-log`, `/qiju-search`, `/qiju-review` — or just ask in natural language; the skill descriptions trigger discovery |
+| **Kiro** (CLI & IDE) | `/qiju-log`, `/qiju-search`, `/qiju-review` as slash commands, backed by the matching skills. In the **IDE** you can also just ask in natural language — "search QiJu for …", "save a QiJu record" — and the skill picks it up. |
+| **Cursor** (CLI & IDE) | `/qiju-log`, `/qiju-search`, `/qiju-review` from `.cursor/skills/` — or natural language |
+| **Codex** (CLI & desktop) | `$qiju-log`, `$qiju-search`, `$qiju-review` — or natural language |
 
 You're the editor; the agent is the note-taker. When you log, the agent summarizes the
 session (or the thing you pointed at) into a structured record and saves it — you decide what
 goes in. At the start of the next session, the agent reads the project summary and the
 relevant records back, so it already knows the history. You always just talk to the agent;
-the agent calls the `kedu` CLI.
+the agent calls the `qiju` CLI.
 
 ### Direct CLI (for scripts, or to see what the agent runs)
 
-The agent ultimately runs the `kedu` CLI, and you can too — for automation or to inspect the
+The agent ultimately runs the `qiju` CLI, and you can too — for automation or to inspect the
 store directly:
 
 ```bash
 # Save a record (the agent builds the JSON; you can also write it yourself or pipe via stdin)
-kedu log --source manual --agent claude --project my-project --body record.json
+qiju log --source manual --agent claude --project my-project --body record.json
 
 # Find records — two-phase: search lists candidate <uuid>:N ids, show hydrates one
-kedu search --scope current_project --query "auth cookie"
-kedu search --scope all --tags security --since 2026-01-01
-kedu show '<session-id>:1'                         # pass the id exactly as search prints it (the ':N' suffix is required)
-kedu projects                                     # list known project slugs
+qiju search --scope current_project --query "auth cookie"
+qiju search --scope all --tags security --since 2026-01-01
+qiju show '<session-id>:1'                         # pass the id exactly as search prints it (the ':N' suffix is required)
+qiju projects                                     # list known project slugs
 
 # Maintenance, redaction, and removal (records are never deleted by uninstall)
-kedu maintain --dry-run
-kedu redact --value "secret-value" --reason "leaked in session"
-kedu migrate --dry-run                            # preview project-name normalization (one-time upgrade step)
+qiju maintain --dry-run
+qiju redact --value "secret-value" --reason "leaked in session"
+qiju migrate --dry-run                            # preview project-name normalization (one-time upgrade step)
 
 # Remove the integration — records are always preserved
-kedu uninstall --dry-run                          # preview everything that would be removed
-kedu uninstall --hosts kiro                        # remove just one host (claude|kiro|codex|cursor)
-kedu uninstall --hosts kiro,cursor --project-only  # one or more hosts, project-local files only
-kedu uninstall --no-scan-projects                  # clean only the current project
-kedu uninstall --user-only                         # only user-level install + global host wiring
+qiju uninstall --dry-run                          # preview everything that would be removed
+qiju uninstall --hosts kiro                        # remove just one host (claude|kiro|codex|cursor)
+qiju uninstall --hosts kiro,cursor --project-only  # one or more hosts, project-local files only
+qiju uninstall --no-scan-projects                  # clean only the current project
+qiju uninstall --user-only                         # only user-level install + global host wiring
 ```
 
-By default `uninstall` cleans ALL discovered Kedu-enabled projects under common project
+By default `uninstall` cleans ALL discovered QiJu-enabled projects under common project
 roots (use `--no-scan-projects` to limit it to the current project). It scopes by **host**
 (`--hosts all` or a comma list) and by **location** (`--project-only`, `--user-only`, or
-both when neither is given), and also removes the runtime lock file `~/.kedu/.kedu.lock`.
+both when neither is given), and also removes the runtime lock file `~/.qiju/.qiju.lock`.
 Your `long` and `short` records are never deleted — only the integration files are.
 
-Records anchor to your project root even if the agent runs `kedu log` from a subfolder — see
+Records anchor to your project root even if the agent runs `qiju log` from a subfolder — see
 [Solution architecture](#solution-architecture) for how that resolution works.
 
 ## Design principles
 
-- **A record layer, not memory** — Kedu captures what happened, who did it, the evidence, and
+- **A record layer, not memory** — QiJu captures what happened, who did it, the evidence, and
   the handoff, so work is auditable, verifiable, and recoverable — not just "remembered."
-- **Local-first by default** — records live in your repo and `~/.kedu`, not a vendor service.
+- **Local-first by default** — records live in your repo and `~/.qiju`, not a vendor service.
 - **You direct what's recorded** — the agent is your secretary; capture is intentional, never
   silent background memory.
-- **Lossless after capture** — once the agent writes a record, Kedu keeps it verbatim; it
+- **Lossless after capture** — once the agent writes a record, QiJu keeps it verbatim; it
   never re-summarizes, compacts, or evicts it.
 - **Records you can see and trust** — explicit notes you and the agent write and can edit, not
   invisible vendor memory.
@@ -311,34 +338,34 @@ Records anchor to your project root even if the agent runs `kedu log` from a sub
 
 ## Solution architecture
 
-This section is the technical deep dive. The sections above are enough to use Kedu; read on
+This section is the technical deep dive. The sections above are enough to use QiJu; read on
 if you want to understand how it works or extend it.
 
 ### Storage tiers
 
 Every record is written to a hot tier and a durable tier on each `log`, then aged into an
-archive tier by `kedu maintain`. Reads merge all three and deduplicate by `id`.
+archive tier by `qiju maintain`. Reads merge all three and deduplicate by `id`.
 
 | Tier | Location | Retention |
 |---|---|---|
-| **short** (hot) | `<project>/.kedu/short.jsonl` | 14-day rolling window, project-local |
-| **long** (durable) | `~/.kedu/long/<project>.jsonl` | All records, shared store |
-| **archive** | `~/.kedu/archive/project=<name>/month=<YYYY-MM>/entries.parquet` | Aged records, DuckDB Parquet |
+| **short** (hot) | `<project>/.qiju/short.jsonl` | 14-day rolling window, project-local |
+| **long** (durable) | `~/.qiju/long/<project>.jsonl` | All records, shared store |
+| **archive** | `~/.qiju/archive/project=<name>/month=<YYYY-MM>/entries.parquet` | Aged records, DuckDB Parquet |
 
 A local init creates:
 
 ```text
-<project>/.kedu/
+<project>/.qiju/
 ├── short.jsonl     # hot tier: 14-day rolling window
 └── config.json     # init marker + canonical project slug
 
-~/.kedu/
+~/.qiju/
 ├── long/<project>.jsonl                                   # durable tier: all records
 ├── archive/project=<name>/month=<YYYY-MM>/entries.parquet # aged records (DuckDB Parquet)
 └── redaction_log.jsonl
 ```
 
-`kedu maintain` rotates the 14-day hot window and archives durable records older than ~92 days
+`qiju maintain` rotates the 14-day hot window and archives durable records older than ~92 days
 (forced at 31 days if the long file exceeds 50 MB) into Parquet via DuckDB.
 
 ### Record schema
@@ -355,7 +382,7 @@ Each record is a JSON object (schema version 2):
   "source": "manual",
   "title": "Fixed project-root resolution for non-git repos",
   "tags": ["bugfix", "paths"],
-  "search_terms": ["project_root", "KEDU_PROJECT_ROOT"],
+  "search_terms": ["project_root", "QIJU_PROJECT_ROOT"],
   "next_steps": ["sync to release", "run smoke matrix"],
   "redactions": [],
   "body_md": "Full human-readable narrative of what happened..."
@@ -364,47 +391,47 @@ Each record is a JSON object (schema version 2):
 
 Valid `source` values are `manual` and `agent`. The `id` is
 `{session-uuid}:{seq}`, where the session UUID comes from the first set of
-`KEDU_SESSION_ID` / `CLAUDE_SESSION_ID` / `CODEX_SESSION_ID` / `KIRO_SESSION_ID`, and `seq`
+`QIJU_SESSION_ID` / `CLAUDE_SESSION_ID` / `CODEX_SESSION_ID` / `KIRO_SESSION_ID`, and `seq`
 increments per session.
 
 ### Deterministic retrieval
 
-Retrieval is two-phase. **Phase 1 — `kedu search`** identifies candidates: it loads all
+Retrieval is two-phase. **Phase 1 — `qiju search`** identifies candidates: it loads all
 tiers for the requested scope, applies structured filters (source, agent, tags, time range),
 then does an exact keyword or regex scan over `title + body_md + tags + search_terms +
 next_steps`. Keyword matching is OR-based per term. Results are sorted by timestamp, newest
 first, and printed as `{session-uuid}:{seq}` ids. There is no embedding model and no
 relevance score — search identifies candidates, and the model decides what matters.
 
-**Phase 2 — `kedu show '<uuid>:N'`** hydrates one record's full body by its exact id. Pass
-the id exactly as `kedu search` prints it, including the `:N` suffix; a bare UUID returns
+**Phase 2 — `qiju show '<uuid>:N'`** hydrates one record's full body by its exact id. Pass
+the id exactly as `qiju search` prints it, including the `:N` suffix; a bare UUID returns
 `record not found` with a hint to add the suffix (the UUID alone denotes a whole session,
 not a single record).
 
 ### Project-root resolution
 
-`kedu log` resolves the project root by precedence:
+`qiju log` resolves the project root by precedence:
 
-1. `KEDU_PROJECT_ROOT` environment variable.
-2. The nearest ancestor directory containing the `.kedu/config.json` init marker (written
-   only by `kedu init`, so a stray `.kedu/` data dir in a subfolder can't hijack resolution).
+1. `QIJU_PROJECT_ROOT` environment variable.
+2. The nearest ancestor directory containing the `.qiju/config.json` init marker (written
+   only by `qiju init`, so a stray `.qiju/` data dir in a subfolder can't hijack resolution).
 3. The git repository root (`git rev-parse --show-toplevel`).
 4. The current working directory, as a last resort.
 
 The project slug is read from the init marker, so records stay anchored to the right project
-even when an agent runs `kedu log` from a subdirectory, and the slug is stable across
+even when an agent runs `qiju log` from a subdirectory, and the slug is stable across
 directory renames. Project names are normalized to one canonical **lowercase** slug at every
 entry point (log, search, storage filenames), so `MyProject` and `myproject` are the same
 project and a casing slip can't fork the history. If none of the above identifies a root and
-no `--project` is given, `kedu log` aborts rather than create a stray identity.
+no `--project` is given, `qiju log` aborts rather than create a stray identity.
 
 ### Redaction
 
 Redaction runs at write time before a record is persisted: regex rules from a configurable
 ruleset, followed by Shannon-entropy detection to catch high-entropy tokens (e.g. keys), with
-an allowlist to bypass known-safe values. `kedu redact --value …` performs retroactive
+an allowlist to bypass known-safe values. `qiju redact --value …` performs retroactive
 redaction, rewriting every JSONL and Parquet tier to replace a literal value and appending an
-audit event to `~/.kedu/redaction_log.jsonl`.
+audit event to `~/.qiju/redaction_log.jsonl`.
 
 > **Redaction is best-effort.** The regex rules and entropy check catch common credentials,
 > secrets, and regex-detectable PII (emails, phone numbers, API keys, SSNs, etc.), but they
@@ -415,24 +442,36 @@ audit event to `~/.kedu/redaction_log.jsonl`.
 > If you need strict PII detection, you can opt in to an external solution as a pre-processing
 > step before logging:
 >
-> - **Microsoft Presidio** — runs locally; keeps text on your machine and preserves Kedu's
+> - **Microsoft Presidio** — runs locally; keeps text on your machine and preserves QiJu's
 >   local-first guarantee.
 > - **Cloud DLP/PII APIs** (AWS, Google, Azure) — more capable, but they send your record text
->   **off the local machine** to a third-party service. That directly conflicts with Kedu's
+>   **off the local machine** to a third-party service. That directly conflicts with QiJu's
 >   local-first promise; only use them if your threat model accepts that tradeoff.
 >
-> Kedu does not bundle Presidio or any cloud SDK — these are documentation suggestions only,
+> QiJu does not bundle Presidio or any cloud SDK — these are documentation suggestions only,
 > not dependencies.
 
 ### Host wiring
 
-`kedu init --host <host>` wires Kedu into a project (or user-global location) per host:
-Claude, Codex, and Kiro each get two skills — `kedu-log` and `kedu-search` — under their
-skills directory (`.claude/skills/`, `.agents/skills/`, `.kiro/skills/`); Kiro also gets a
-CLI agent config under `.kiro/`. Cursor gets a single rule under `.cursor/rules/` (the
-Cursor CLI is verified; the Cursor IDE is not). The skills only tell the agent how to call
-the `kedu` CLI — records are always written by the CLI to the tiers above, never by the
-skill or rule itself.
+`qiju init --host <host>` wires QiJu into a project (or user-global location) per host:
+Claude, Codex, Kiro, and Cursor each get three skills — `qiju-log`, `qiju-search`, and
+`qiju-review` — under the provider's skills directory (`.claude/skills/`,
+`.agents/skills/`, `.kiro/skills/`, `.cursor/skills/`). The skills only tell the agent how
+to call the `qiju` CLI — records are always written by the CLI to the tiers above, never by
+the skill itself.
+
+QiJu ships only the portable Agent Skills shape: `skills/<skill-name>/SKILL.md`, plus
+portable optional folders such as `scripts/`, `references/`, or `assets/` if a future skill
+needs them. It does not ship provider-specific metadata files. If you want provider-specific
+behavior, add it manually to your own installed copy after `qiju init`: for example, Codex
+users can add `agents/openai.yaml` for Codex app UI metadata or invocation policy, Cursor
+users can add Cursor-only frontmatter such as `paths` or `disable-model-invocation`, Kiro
+users can create their own `.kiro/agents/qiju.json` if they want a named Kiro CLI agent,
+and Claude users can add provider-supported optional fields where the docs allow them. See
+the provider docs for details: [Codex](https://developers.openai.com/codex/skills),
+[Kiro](https://kiro.dev/docs/skills/),
+[Claude](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview), and
+[Cursor](https://cursor.com/docs/skills).
 
 ## License
 

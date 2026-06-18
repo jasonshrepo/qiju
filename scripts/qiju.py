@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 try:
@@ -21,7 +22,7 @@ except ImportError:  # pragma: no cover
 
 
 # Keep in sync with pyproject.toml [project].version
-KEDU_VERSION = "0.3.1"
+QIJU_VERSION = "0.4.0"
 
 
 def _print_json(value) -> None:
@@ -85,12 +86,12 @@ def cmd_log(args: argparse.Namespace) -> int:
         print(entry_id)
         return 0
     except (ValueError, schema.ValidationError, OSError, json.JSONDecodeError) as exc:
-        print(f"kedu log: {exc}", file=sys.stderr)
+        print(f"qiju log: {exc}", file=sys.stderr)
         return 1
 
 
 def _print_init_result(results: list[dict], *, mode: str) -> None:
-    print(f"kedu init ({mode})")
+    print(f"qiju init ({mode})")
     for result in results:
         print()
         project = result.get("project")
@@ -98,7 +99,7 @@ def _print_init_result(results: list[dict], *, mode: str) -> None:
         print(f"{header} project: {project}" if project else header)
         if result.get("project_root"):
             print(f"  root: {result['project_root']}")
-        print(f"  home: {result['kedu_home']}")
+        print(f"  home: {result['qiju_home']}")
         files = result.get("files") or []
         if files:
             print("  Files:")
@@ -123,7 +124,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         # Empty host -> single auto-detected init; "all"/comma list -> one init per host.
         hosts: tuple[str | None, ...] = init_cmd.parse_hosts(args.host) or (None,)
         results = [
-            init_cmd.init_kedu(mode=mode, project=args.project, agent=host).as_dict()
+            init_cmd.init_qiju(mode=mode, project=args.project, agent=host).as_dict()
             for host in hosts
         ]
         if args.json:
@@ -132,7 +133,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             _print_init_result(results, mode=mode)
         return 0
     except Exception as exc:
-        print(f"kedu init: {exc}", file=sys.stderr)
+        print(f"qiju init: {exc}", file=sys.stderr)
         return 1
 
 
@@ -141,6 +142,7 @@ def cmd_search(args: argparse.Namespace) -> int:
         results = search.search_entries(
             scope=args.scope,
             query=args.query,
+            session=args.session,
             project=args.project,
             tags=args.tags or [],
             since=args.since,
@@ -171,7 +173,7 @@ def cmd_search(args: argparse.Namespace) -> int:
             _print_json([_project_entry(entry, fields) for entry in results] if fields else results)
         return 0
     except Exception as exc:
-        print(f"kedu search: {exc}", file=sys.stderr)
+        print(f"qiju search: {exc}", file=sys.stderr)
         return 1
 
 
@@ -180,15 +182,15 @@ def cmd_show(args: argparse.Namespace) -> int:
     if entry is None:
         if ":" not in args.id:
             print(
-                f"kedu show: record not found: {args.id}\n"
+                f"qiju show: record not found: {args.id}\n"
                 f"  Hint: ids carry a :N suffix (e.g. {args.id}:1). "
-                f"Run 'kedu search' to find the exact id.",
+                f"Run 'qiju search' to find the exact id.",
                 file=sys.stderr,
             )
         else:
             print(
-                f"kedu show: record not found: {args.id}\n"
-                f"  Hint: Run 'kedu search' to find the exact id.",
+                f"qiju show: record not found: {args.id}\n"
+                f"  Hint: Run 'qiju search' to find the exact id.",
                 file=sys.stderr,
             )
         return 1
@@ -199,7 +201,7 @@ def cmd_show(args: argparse.Namespace) -> int:
 def cmd_redact(args: argparse.Namespace) -> int:
     if not args.value or not args.value.strip():
         print(
-            "kedu redact: --value must be a non-empty, non-whitespace string; "
+            "qiju redact: --value must be a non-empty, non-whitespace string; "
             "an empty value would corrupt every record",
             file=sys.stderr,
         )
@@ -214,7 +216,7 @@ def cmd_redact(args: argparse.Namespace) -> int:
         _print_json(event)
         return 0
     except Exception as exc:
-        print(f"kedu redact: {exc}", file=sys.stderr)
+        print(f"qiju redact: {exc}", file=sys.stderr)
         return 1
 
 
@@ -224,19 +226,19 @@ def cmd_maintain(args: argparse.Namespace) -> int:
         _print_json(result)
         return 0
     except Exception as exc:
-        print(f"kedu maintain: {exc}", file=sys.stderr)
+        print(f"qiju maintain: {exc}", file=sys.stderr)
         return 1
 
 
 def _print_uninstall_result(result: cleanup_mod.CleanupResult) -> None:
     label = "dry-run" if result.dry_run else "uninstall"
-    print(f"kedu {label}")
+    print(f"qiju {label}")
     print()
     if result.actions:
         print("Removed:")
         for action in result.actions:
             if action.executed or result.dry_run:
-                verb = {"remove_file": "file", "remove_dir": "dir", "remove_kedu_block": "block"}.get(action.action, action.action)
+                verb = {"remove_file": "file", "remove_dir": "dir", "remove_qiju_block": "block"}.get(action.action, action.action)
                 print(f"  [{verb}] {action.path}")
     else:
         print("  (nothing to remove)")
@@ -276,40 +278,46 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
         _print_uninstall_result(result)
         return 0
     except Exception as exc:
-        print(f"kedu uninstall: {exc}", file=sys.stderr)
+        print(f"qiju uninstall: {exc}", file=sys.stderr)
         return 1
 
 
 def cmd_migrate(args: argparse.Namespace) -> int:
     try:
-        report = migrate_mod.migrate_project_names(
-            project=args.project,
-            dry_run=args.dry_run,
-        )
+        if getattr(args, "from_kedu", False):
+            report = migrate_mod.migrate_from_kedu(
+                project_root=args.project_root or os.getcwd(),
+                dry_run=args.dry_run,
+            )
+        else:
+            report = migrate_mod.migrate_project_names(
+                project=args.project,
+                dry_run=args.dry_run,
+            )
         _print_json(report)
         return 0
     except Exception as exc:
-        print(f"kedu migrate: {exc}", file=sys.stderr)
+        print(f"qiju migrate: {exc}", file=sys.stderr)
         return 1
 
 
 def cmd_projects(args: argparse.Namespace) -> int:
     try:
-        projects = storage.all_projects(paths_mod.kedu_home())
+        projects = storage.all_projects(paths_mod.qiju_home())
         for project in projects:
             print(project)
         return 0
     except Exception as exc:
-        print(f"kedu projects: {exc}", file=sys.stderr)
+        print(f"qiju projects: {exc}", file=sys.stderr)
         return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="kedu")
-    parser.add_argument("--version", action="version", version=f"kedu {KEDU_VERSION}")
+    parser = argparse.ArgumentParser(prog="qiju")
+    parser.add_argument("--version", action="version", version=f"qiju {QIJU_VERSION}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="Enable Kedu for a host; project-local by default")
+    init_parser = subparsers.add_parser("init", help="Enable Qiju for a host; project-local by default")
     init_parser.add_argument("--host", help="Host(s) to wire: claude, kiro, codex, cursor; 'all'; or a comma list, e.g. claude,codex")
     init_parser.add_argument("--global", dest="global_init", action="store_true", help="Install user-level host defaults instead of project-local files")
     init_parser.add_argument("--local", dest="local_init", action="store_true", help="Explicitly install project-local files")
@@ -318,7 +326,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON instead of the human-readable summary")
     init_parser.set_defaults(func=cmd_init)
 
-    log_parser = subparsers.add_parser("log", help="Capture a structured Kedu record")
+    log_parser = subparsers.add_parser("log", help="Capture a structured Qiju record")
     log_parser.add_argument("--source", required=True, choices=schema.VALID_SOURCES)
     log_parser.add_argument("--agent", help="Agent/host identity, e.g. claude-code, codex, kiro")
     log_parser.add_argument("--project")
@@ -326,10 +334,11 @@ def build_parser() -> argparse.ArgumentParser:
     log_parser.add_argument("--session-id")
     log_parser.set_defaults(func=cmd_log)
 
-    search_parser = subparsers.add_parser("search", help="Find candidate Kedu records")
+    search_parser = subparsers.add_parser("search", help="Find candidate Qiju records")
     search_parser.add_argument("--scope", default="current_project")
     search_parser.add_argument("--project")
     search_parser.add_argument("--query")
+    search_parser.add_argument("--session", help="Filter to all records with the given session UUID prefix")
     search_parser.add_argument("--tags", action="append")
     search_parser.add_argument("--since")
     search_parser.add_argument("--until")
@@ -344,7 +353,7 @@ def build_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("--format", choices=("json", "jsonl", "summary", "table", "actions"), default="json")
     search_parser.set_defaults(func=cmd_search)
 
-    show_parser = subparsers.add_parser("show", help="Hydrate one Kedu record by id")
+    show_parser = subparsers.add_parser("show", help="Hydrate one Qiju record by id")
     show_parser.add_argument("id")
     show_parser.add_argument("--project")
     show_parser.add_argument("--fields", help="Comma-separated fields to keep, e.g. title,ts,next_steps")
@@ -362,23 +371,25 @@ def build_parser() -> argparse.ArgumentParser:
     maintain_parser.add_argument("--dry-run", action="store_true")
     maintain_parser.set_defaults(func=cmd_maintain)
 
-    uninstall_parser = subparsers.add_parser("uninstall", help="Remove Kedu installation files without deleting records")
+    uninstall_parser = subparsers.add_parser("uninstall", help="Remove Qiju installation files without deleting records")
     uninstall_scope = uninstall_parser.add_mutually_exclusive_group()
     uninstall_scope.add_argument("--user-only", action="store_true", help="Remove only user-level install files and global host integrations")
-    uninstall_scope.add_argument("--project-only", action="store_true", help="Remove only project-local Kedu integration")
+    uninstall_scope.add_argument("--project-only", action="store_true", help="Remove only project-local Qiju integration")
     uninstall_parser.add_argument("--dry-run", action="store_true", help="Preview actions without removing files")
     uninstall_parser.add_argument("--project-root", "--project-path", dest="project_root", help="Project root to clean; defaults to the current directory")
     uninstall_parser.add_argument("--project", help="Project slug override")
     uninstall_parser.add_argument("--hosts", default="all", help="all or comma list: claude,kiro,codex,cursor")
-    uninstall_parser.add_argument("--scan-projects", action=argparse.BooleanOptionalAction, default=True, help="Scan common project roots and clean ALL discovered Kedu-enabled projects (default: on). Use --no-scan-projects to clean only the current project.")
-    uninstall_parser.add_argument("--scan-root", action="append", help="Root to scan for Kedu-enabled projects; can be repeated")
+    uninstall_parser.add_argument("--scan-projects", action=argparse.BooleanOptionalAction, default=True, help="Scan common project roots and clean ALL discovered Qiju-enabled projects (default: on). Use --no-scan-projects to clean only the current project.")
+    uninstall_parser.add_argument("--scan-root", action="append", help="Root to scan for Qiju-enabled projects; can be repeated")
     uninstall_parser.add_argument("--scan-depth", type=int, default=cleanup_mod.DEFAULT_SCAN_DEPTH, help="Maximum scan depth for project discovery")
-    uninstall_parser.add_argument("--bin-dir", help="Kedu shim directory, default: ~/.local/bin")
-    uninstall_parser.add_argument("--install-root", help="Installed Kedu engine path, default: ~/.kedu/kedu")
+    uninstall_parser.add_argument("--bin-dir", help="Qiju shim directory, default: ~/.local/bin")
+    uninstall_parser.add_argument("--install-root", help="Installed Qiju engine path, default: ~/.qiju/qiju")
     uninstall_parser.set_defaults(func=cmd_uninstall)
 
     migrate_parser = subparsers.add_parser("migrate", help="Normalize project names to lowercase across stored records (one-time migration)")
     migrate_parser.add_argument("--project", help="Limit migration to one project slug")
+    migrate_parser.add_argument("--from-kedu", dest="from_kedu", action="store_true", help="One-time brand migration: copy the legacy ~/.kedu store into ~/.qiju, rewriting kedu->qiju in every record (slugs, tags, bodies). The legacy store is preserved as a backup.")
+    migrate_parser.add_argument("--project-root", dest="project_root", help="With --from-kedu, the project root whose local .kedu dir to migrate (defaults to cwd)")
     migrate_parser.add_argument("--dry-run", action="store_true", help="Report planned changes without writing anything")
     migrate_parser.set_defaults(func=cmd_migrate)
 

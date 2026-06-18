@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.3.0"
-BIN_DIR="${KEDU_BIN_DIR:-$HOME/.local/bin}"
-KEDU_HOME="${KEDU_HOME:-$HOME/.kedu}"
-INSTALL_ROOT="${KEDU_INSTALL_ROOT:-}"
-PROJECT_DIR="${KEDU_PROJECT_DIR:-}"
-AGENTS="${KEDU_AGENTS:-none}"
+VERSION="0.4.0"
+BIN_DIR="${QIJU_BIN_DIR:-$HOME/.local/bin}"
+QIJU_HOME="${QIJU_HOME:-$HOME/.qiju}"
+INSTALL_ROOT="${QIJU_INSTALL_ROOT:-}"
+PROJECT_DIR="${QIJU_PROJECT_DIR:-}"
+AGENTS="${QIJU_AGENTS:-none}"
 DRY_RUN=0
 PROJECT_EXPLICIT=0
 INSTALL_LAUNCHD=0
-LAUNCHD_LABEL="${KEDU_LAUNCHD_LABEL:-org.kedu.maintain}"
+LAUNCHD_LABEL="${QIJU_LAUNCHD_LABEL:-org.qiju.maintain}"
 
 usage() {
   cat <<'USAGE'
-Kedu installer
+Qiju installer
 
 Usage:
   bash install.sh [options]
 
 Options:
-  --prefix PATH        Install engine files here (default: <kedu-home>/kedu)
-  --bin-dir PATH       Install kedu shim here (default: ~/.local/bin)
-  --kedu-home PATH     Shared Kedu store (default: ~/.kedu)
+  --prefix PATH        Install engine files here (default: <qiju-home>/qiju)
+  --bin-dir PATH       Install qiju shim here (default: ~/.local/bin)
+  --qiju-home PATH     Shared Qiju store (default: ~/.qiju)
   --project PATH       Project/workspace path for project-local agent files
   --agents LIST        Optional batch agent setup: all or comma list: claude,kiro,codex,cursor
   --install-launchd    Install macOS LaunchAgent for scheduled maintenance
@@ -31,8 +31,8 @@ Options:
 
 Examples:
   bash install.sh
-  cd /path/to/repo && kedu init --host codex
-  kedu init --host codex --global  # optional later
+  cd /path/to/repo && qiju init --host codex
+  qiju init --host codex --global  # optional later
 
 Batch mode is still available:
   bash install.sh --agents claude
@@ -80,7 +80,7 @@ script_dir() {
 
 SOURCE_DIR="$(script_dir)"
 
-if [ -n "${KEDU_PROJECT_DIR:-}" ]; then
+if [ -n "${QIJU_PROJECT_DIR:-}" ]; then
   PROJECT_EXPLICIT=1
 fi
 
@@ -96,9 +96,9 @@ while [ "$#" -gt 0 ]; do
       BIN_DIR="$2"
       shift 2
       ;;
-    --kedu-home)
+    --qiju-home)
       require_arg "$1" "${2:-}"
-      KEDU_HOME="$2"
+      QIJU_HOME="$2"
       shift 2
       ;;
     --project)
@@ -131,9 +131,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 BIN_DIR="${BIN_DIR/#\~/$HOME}"
-KEDU_HOME="${KEDU_HOME/#\~/$HOME}"
+QIJU_HOME="${QIJU_HOME/#\~/$HOME}"
 if [ -z "$INSTALL_ROOT" ]; then
-  INSTALL_ROOT="$KEDU_HOME/kedu"
+  INSTALL_ROOT="$QIJU_HOME/qiju"
 else
   INSTALL_ROOT="${INSTALL_ROOT/#\~/$HOME}"
 fi
@@ -196,13 +196,13 @@ install_file() {
 
 clean_install_root() {
   [ -d "$INSTALL_ROOT" ] || return 0
-  # Guard against deleting the record store: refuse if KEDU_HOME is the install
-  # root or lives inside it. In the default layout INSTALL_ROOT=$KEDU_HOME/kedu,
-  # so the record store under $KEDU_HOME is a SIBLING of the install root and
+  # Guard against deleting the record store: refuse if QIJU_HOME is the install
+  # root or lives inside it. In the default layout INSTALL_ROOT=$QIJU_HOME/qiju,
+  # so the record store under $QIJU_HOME is a SIBLING of the install root and
   # this guard passes (pruning is safe).
-  case "$KEDU_HOME/" in
+  case "$QIJU_HOME/" in
     "$INSTALL_ROOT"/*)
-      die "refusing to reinstall: kedu home ($KEDU_HOME) is inside the engine path ($INSTALL_ROOT); use a separate --prefix or --kedu-home"
+      die "refusing to reinstall: qiju home ($QIJU_HOME) is inside the engine path ($INSTALL_ROOT); use a separate --prefix or --qiju-home"
       ;;
   esac
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -216,7 +216,7 @@ clean_install_root() {
 
 copy_project() {
   require_command tar
-  log "Installing Kedu $VERSION"
+  log "Installing Qiju $VERSION"
   log "source: $SOURCE_DIR"
   log "target: $INSTALL_ROOT"
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -249,28 +249,27 @@ sync_python_env() {
   )
 }
 
-install_kedu_shim() {
+install_qiju_shim() {
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] write $BIN_DIR/kedu"
+    log "[dry-run] write $BIN_DIR/qiju"
     return 0
   fi
   mkdir -p "$BIN_DIR"
-  cat > "$BIN_DIR/kedu" <<EOF
+  cat > "$BIN_DIR/qiju" <<EOF
 #!/usr/bin/env bash
-export KEDU_HOME="\${KEDU_HOME:-$KEDU_HOME}"
-exec "$INSTALL_ROOT/.venv/bin/kedu" "\$@"
+export QIJU_HOME="\${QIJU_HOME:-$QIJU_HOME}"
+exec "$INSTALL_ROOT/.venv/bin/qiju" "\$@"
 EOF
-  chmod 0755 "$BIN_DIR/kedu"
-  log "installed: $BIN_DIR/kedu"
+  chmod 0755 "$BIN_DIR/qiju"
+  log "installed: $BIN_DIR/qiju"
 }
 
 install_shared_store() {
-  run mkdir -p "$KEDU_HOME/long" "$KEDU_HOME/archive" "$KEDU_HOME/adapters" "$KEDU_HOME/agents" "$KEDU_HOME/logs"
-  install_file "$SOURCE_DIR/adapters/claude_code.sh" "$KEDU_HOME/adapters/claude_code.sh" 0755
-  install_file "$SOURCE_DIR/skills/kedu-log/SKILL.md" "$KEDU_HOME/agents/kedu-log-skill.md" 0644
-  install_file "$SOURCE_DIR/skills/kedu-search/SKILL.md" "$KEDU_HOME/agents/kedu-search-skill.md" 0644
-  install_file "$SOURCE_DIR/agents/kiro/agents/kedu.json" "$KEDU_HOME/agents/kiro-kedu-agent.json" 0644
-  install_file "$SOURCE_DIR/agents/cursor/rules/kedu.mdc" "$KEDU_HOME/agents/cursor-kedu.mdc" 0644
+  run mkdir -p "$QIJU_HOME/long" "$QIJU_HOME/archive" "$QIJU_HOME/adapters" "$QIJU_HOME/agents" "$QIJU_HOME/logs"
+  install_file "$SOURCE_DIR/adapters/claude_code.sh" "$QIJU_HOME/adapters/claude_code.sh" 0755
+  install_file "$SOURCE_DIR/skills/qiju-log/SKILL.md" "$QIJU_HOME/agents/qiju-log-skill.md" 0644
+  install_file "$SOURCE_DIR/skills/qiju-search/SKILL.md" "$QIJU_HOME/agents/qiju-search-skill.md" 0644
+  install_file "$SOURCE_DIR/skills/qiju-review/SKILL.md" "$QIJU_HOME/agents/qiju-review-skill.md" 0644
 }
 
 install_launchd() {
@@ -282,8 +281,8 @@ install_launchd() {
   local target_dir="$HOME/Library/LaunchAgents"
   local target_plist="$target_dir/$LAUNCHD_LABEL.plist"
   local python_bin="$INSTALL_ROOT/.venv/bin/python"
-  local kedu_script="$INSTALL_ROOT/scripts/kedu.py"
-  local log_dir="$KEDU_HOME/logs"
+  local qiju_script="$INSTALL_ROOT/scripts/qiju.py"
+  local log_dir="$QIJU_HOME/logs"
 
   if [ "$DRY_RUN" -eq 1 ]; then
     log "[dry-run] write $target_plist"
@@ -301,13 +300,13 @@ install_launchd() {
   <string>$LAUNCHD_LABEL</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>KEDU_HOME</key>
-    <string>$KEDU_HOME</string>
+    <key>QIJU_HOME</key>
+    <string>$QIJU_HOME</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
     <string>$python_bin</string>
-    <string>$kedu_script</string>
+    <string>$qiju_script</string>
     <string>maintain</string>
   </array>
   <key>StartCalendarInterval</key>
@@ -318,9 +317,9 @@ install_launchd() {
     <integer>0</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>$log_dir/kedu-maintain.log</string>
+  <string>$log_dir/qiju-maintain.log</string>
   <key>StandardErrorPath</key>
-  <string>$log_dir/kedu-maintain.err</string>
+  <string>$log_dir/qiju-maintain.err</string>
 </dict>
 </plist>
 EOF
@@ -384,27 +383,27 @@ should_install_agent() {
 install_claude() {
   log "Installing Claude Code integration"
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] kedu init --host claude --global"
+    log "[dry-run] qiju init --host claude --global"
   else
-    KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host claude --global >/dev/null
+    QIJU_HOME="$QIJU_HOME" QIJU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/qiju" init --host claude --global >/dev/null
   fi
   if [ -n "$PROJECT_DIR" ]; then
     if [ "$DRY_RUN" -eq 1 ]; then
-      log "[dry-run] cd $PROJECT_DIR && kedu init --host claude"
+      log "[dry-run] cd $PROJECT_DIR && qiju init --host claude"
     else
-      (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host claude >/dev/null)
+      (cd "$PROJECT_DIR" && QIJU_HOME="$QIJU_HOME" QIJU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/qiju" init --host claude >/dev/null)
     fi
   fi
-  log "Claude integration registered through Kedu init"
+  log "Claude integration registered through Qiju init"
 }
 
 install_kiro() {
   [ -n "$PROJECT_DIR" ] || die "Kiro integration requires --project"
   log "Installing Kiro integration for project: $PROJECT_DIR"
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] cd $PROJECT_DIR && kedu init --host kiro"
+    log "[dry-run] cd $PROJECT_DIR && qiju init --host kiro"
   else
-    (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host kiro >/dev/null)
+    (cd "$PROJECT_DIR" && QIJU_HOME="$QIJU_HOME" QIJU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/qiju" init --host kiro >/dev/null)
   fi
 }
 
@@ -412,9 +411,9 @@ install_codex() {
   [ -n "$PROJECT_DIR" ] || die "Codex integration requires --project"
   log "Installing Codex integration for project: $PROJECT_DIR"
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] cd $PROJECT_DIR && kedu init --host codex"
+    log "[dry-run] cd $PROJECT_DIR && qiju init --host codex"
   else
-    (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host codex >/dev/null)
+    (cd "$PROJECT_DIR" && QIJU_HOME="$QIJU_HOME" QIJU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/qiju" init --host codex >/dev/null)
   fi
 }
 
@@ -422,35 +421,61 @@ install_cursor() {
   [ -n "$PROJECT_DIR" ] || die "Cursor integration requires --project"
   log "Installing Cursor integration for project: $PROJECT_DIR"
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "[dry-run] cd $PROJECT_DIR && kedu init --host cursor"
+    log "[dry-run] cd $PROJECT_DIR && qiju init --host cursor"
   else
-    (cd "$PROJECT_DIR" && KEDU_HOME="$KEDU_HOME" KEDU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/kedu" init --host cursor >/dev/null)
+    (cd "$PROJECT_DIR" && QIJU_HOME="$QIJU_HOME" QIJU_INSTALL_ROOT="$INSTALL_ROOT" "$INSTALL_ROOT/.venv/bin/qiju" init --host cursor >/dev/null)
   fi
 }
 
 print_status() {
   log ""
   log "Install status"
-  log "  kedu home:  $KEDU_HOME"
+  log "  qiju home:  $QIJU_HOME"
   log "  engine path:  $INSTALL_ROOT"
-  log "  kedu CLI:   $BIN_DIR/kedu"
+  log "  qiju CLI:   $BIN_DIR/qiju"
   if [ -n "$PROJECT_DIR" ]; then
     log "  project path: $PROJECT_DIR"
   else
     log "  project path: (none; project-local integrations skipped)"
   fi
-  if command -v "$BIN_DIR/kedu" >/dev/null 2>&1 || [ -x "$BIN_DIR/kedu" ]; then
+  if command -v "$BIN_DIR/qiju" >/dev/null 2>&1 || [ -x "$BIN_DIR/qiju" ]; then
     log "  cli check:    ok"
   else
     log "  cli check:    add $BIN_DIR to PATH"
   fi
 }
 
+migrate_legacy_kedu() {
+  # One-time, lossless brand migration: if a legacy ~/.kedu record store exists, copy
+  # it into the new QIJU_HOME (rewriting kedu->qiju in every record). The legacy store
+  # is left untouched as a backup; the migration is idempotent (sentinel-guarded).
+  local legacy_home="$HOME/.kedu"
+  if [ ! -d "$legacy_home" ]; then
+    log "skip: no legacy ~/.kedu store to migrate"
+    return 0
+  fi
+  if [ "$legacy_home" = "$QIJU_HOME" ]; then
+    return 0
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "[dry-run] qiju migrate --from-kedu (legacy store: $legacy_home -> $QIJU_HOME)"
+    return 0
+  fi
+  log "Migrating legacy Kedu records: $legacy_home -> $QIJU_HOME"
+  if QIJU_HOME="$QIJU_HOME" "$INSTALL_ROOT/.venv/bin/qiju" migrate --from-kedu \
+       --project-root "${PROJECT_DIR:-$PWD}" >/dev/null; then
+    log "migration complete (legacy ~/.kedu preserved as backup)"
+  else
+    log "warning: kedu->qiju record migration reported an error; legacy ~/.kedu is intact"
+  fi
+}
+
 main() {
   copy_project
   sync_python_env
-  install_kedu_shim
+  install_qiju_shim
   install_shared_store
+  migrate_legacy_kedu
   if [ "$INSTALL_LAUNCHD" -eq 1 ]; then
     install_launchd
   fi
@@ -459,7 +484,7 @@ main() {
   for agent_name in claude kiro codex cursor; do
     if should_install_agent "$agent_name"; then
       if is_project_scoped_agent "$agent_name" && [ -z "$PROJECT_DIR" ]; then
-        log "skip: $agent_name integration requires --project; template installed under $KEDU_HOME/agents"
+        log "skip: $agent_name integration requires --project; template installed under $QIJU_HOME/agents"
         continue
       fi
       "install_$agent_name"
@@ -471,8 +496,8 @@ main() {
 
   if [ "$installed_any_agent" -eq 0 ]; then
     log "no agent integrations installed by install.sh"
-    log "next: cd into a project and run 'kedu init --host <claude|kiro|codex|cursor>'"
-    log "optional later: run 'kedu init --host <host> --global' for user-level defaults"
+    log "next: cd into a project and run 'qiju init --host <claude|kiro|codex|cursor>'"
+    log "optional later: run 'qiju init --host <host> --global' for user-level defaults"
   fi
   print_status
 }

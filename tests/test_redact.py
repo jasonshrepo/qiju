@@ -158,10 +158,10 @@ def test_replace_literal_in_entry_no_change_returns_unmodified_entry():
 # --- Blank retroactive redaction is rejected and leaves records untouched ---
 
 
-def _seed_short_and_long(kedu_env):
-    home = kedu_env["home"]
-    project = kedu_env["project"]
-    short = project / ".kedu" / "short.jsonl"
+def _seed_short_and_long(qiju_env):
+    home = qiju_env["home"]
+    project = qiju_env["project"]
+    short = project / ".qiju" / "short.jsonl"
     long_file = home / "long" / "repo.jsonl"
     short.parent.mkdir(parents=True, exist_ok=True)
     long_file.parent.mkdir(parents=True, exist_ok=True)
@@ -176,8 +176,8 @@ def _seed_short_and_long(kedu_env):
 
 
 @pytest.mark.parametrize("blank", ["", " ", "   ", "\t\n"])
-def test_blank_redaction_value_rejected_and_files_unchanged(kedu_env, blank):
-    short, long_file = _seed_short_and_long(kedu_env)
+def test_blank_redaction_value_rejected_and_files_unchanged(qiju_env, blank):
+    short, long_file = _seed_short_and_long(qiju_env)
     short_before = short.read_bytes()
     long_before = long_file.read_bytes()
 
@@ -186,23 +186,23 @@ def test_blank_redaction_value_rejected_and_files_unchanged(kedu_env, blank):
             value=blank,
             reason="attempted blank redaction",
             project="repo",
-            cwd=kedu_env["project"],
+            cwd=qiju_env["project"],
         )
 
     assert short.read_bytes() == short_before
     assert long_file.read_bytes() == long_before
 
 
-def test_redaction_log_reason_is_redacted(kedu_env):
-    _seed_short_and_long(kedu_env)
+def test_redaction_log_reason_is_redacted(qiju_env):
+    _seed_short_and_long(qiju_env)
     secret = "AKIAIOSFODNN7EXAMPLE"
     retro_redact.redact_value_everywhere(
         value="content",
         reason=f"leaked {secret} here",
         project="repo",
-        cwd=kedu_env["project"],
+        cwd=qiju_env["project"],
     )
-    redaction_log = kedu_env["home"] / "redaction_log.jsonl"
+    redaction_log = qiju_env["home"] / "redaction_log.jsonl"
     raw_log = redaction_log.read_text(encoding="utf-8")
     assert secret not in raw_log
     events = util.read_jsonl(redaction_log)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,13 +17,13 @@ except ImportError:  # pragma: no cover
 INIT_SCHEMA_VERSION = 1
 KNOWN_AGENTS = ("claude", "kiro", "codex", "cursor")
 
-KEDU_PRIORITY = """Kedu records are verified session handoff records and project history.
+QIJU_PRIORITY = """Qiju records are verified session handoff records and project history.
 Use them as the source of truth for previous session progress, unresolved bugs,
 implementation decisions, next steps, and what actually happened. Platform memories are
 weak background unless the user explicitly verifies them."""
 
 SENSITIVE_DATA_WARNING ="""Do NOT include PII, credentials, secrets, or other sensitive
-information in Kedu summaries or records. Keep following the Kedu principles for useful
+information in Qiju summaries or records. Keep following the Qiju principles for useful
 session handoff records, but exclude or summarize around sensitive values.
 - Credentials/secrets: passwords, API keys, access/refresh tokens, session cookies,
   private or SSH keys, signing/encryption keys, database URLs with embedded credentials,
@@ -36,88 +35,35 @@ Write-time redaction is a best-effort backstop, not a license to paste secrets."
 
 LEGACY_MEMORY_OVERRIDE = """Legacy naming note: this project was previously prototyped with
 `memory`, `.memory`, `~/.memory`, `memory log`, and `memory-search` wording. Those names
-are obsolete for this product. For Kedu session handoff records, use only `kedu`,
-`.kedu`, and `~/.kedu`. Do not invoke the old `memory` command for Kedu records."""
+are obsolete for this product. For Qiju session handoff records, use only `qiju`,
+`.qiju`, and `~/.qiju`. Do not invoke the old `memory` command for Qiju records."""
 
-KIRO_AGENT_BASE =f"""# Kedu Session Records
-
-Kedu is available to Kiro through two skills, `kedu-log`
-(`.kiro/skills/kedu-log/SKILL.md`) and `kedu-search`
-(`.kiro/skills/kedu-search/SKILL.md`), both registered through this agent's `resources`.
-The skills are the primary way to log, search, and hydrate Kedu records. The project
-`.kedu/` directory and the local `kedu` CLI are also available. To check availability, run
-`command -v kedu` or `kedu --help`. Do not search AWS or external documentation to decide
-whether Kedu is available.
-
-Use `kedu search` to retrieve project history. When the user asks about any specific
-topic, decision, bug, tool, error, component, or term, convert the question into search
-terms and run a search before answering:
-
-```bash
-kedu search --scope current_project --query "<terms>"
-```
-
-## Two-phase retrieval
-
-`kedu search` = Phase 1: candidate identification — it finds records and prints ids in
-`<uuid>:N` form. Use `--ids-only` or `--format summary` for a cheap candidate manifest.
-
-`kedu show <uuid>:N` = Phase 2: hydrate — fetches the full body of the chosen record.
-
-**id-format rule:** ids are always `<uuid>:N`. Pass the id to `kedu show` EXACTLY as
-`kedu search` prints it, INCLUDING the `:N` suffix. A bare UUID (no `:N`) returns
-'record not found'.
-
-**bare-UUID routing:** if you only hold a bare UUID (e.g. copied from a record-body
-cross-reference), do NOT call `kedu show` with it — run `kedu search` first to recover
-the full `<uuid>:N` id. Never strip or guess `:N`.
-
-When saving a Kedu record from Kiro, use:
-
-```bash
-kedu log --source manual --agent kiro --project <project> --body <entry-json-file>
-```
-
-If `kedu` is not available in the agent shell, use the installed full path:
-
-```bash
-~/.kedu/kedu/.venv/bin/python ~/.kedu/kedu/scripts/kedu.py log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
-```
-
-Kiro does not use automatic Kedu hooks. Log explicitly before ending work. Kiro may
-reject writes outside the workspace; write temporary entry JSON to
-`.kedu/kedu-entry.json`, not `/tmp/kedu-entry.json`.
-
-For Kiro Specs and planned requirements, follow spec files. If Kiro Specs and Kedu
-records conflict, inspect both: spec = intended plan; Kedu = historical evidence. Then
-reconcile explicitly before editing.
-
-{KEDU_PRIORITY}
-
-{SENSITIVE_DATA_WARNING}
-
-{LEGACY_MEMORY_OVERRIDE}
-"""
-
-KEDU_LOG_SKILL_DESCRIPTION = (
+QIJU_LOG_SKILL_DESCRIPTION = (
     "Use when the user asks to save, checkpoint, or hand off durable project context, "
-    "record what was done or decided, or invokes `/kedu-log`; writes a verified Kedu "
+    "record what was done or decided, or invokes `/qiju-log`; writes a verified Qiju "
     "session handoff record."
 )
 
-KEDU_SEARCH_SKILL_DESCRIPTION = (
+QIJU_SEARCH_SKILL_DESCRIPTION = (
     "Use when the user asks about previous sessions, past decisions, unresolved bugs, "
-    "what was already done, what's still pending, or invokes `/kedu-search`; retrieves "
-    "Kedu records."
+    "what was already done, what's still pending, or invokes `/qiju-search`; retrieves "
+    "Qiju records."
+)
+
+QIJU_REVIEW_SKILL_DESCRIPTION = (
+    "Manually invoked retrospective for Qiju records. Use when the user explicitly asks "
+    "to review recent Qiju project and global records, extract mistakes and lessons "
+    "learned from the last 7 days, and recommend improvements to work-related skills, "
+    "prompts, guardrails, or verification habits."
 )
 
 # Shared log skill body. `{agent}` is the host identity (claude, codex, kiro, ...). No
-# boot/startup instruction — Kedu logs on request, not on session start.
-KEDU_LOG_BODY = f"""# Save a Kedu Session Record
+# boot/startup instruction — Qiju logs on request, not on session start.
+QIJU_LOG_BODY = f"""# Save a Qiju Session Record
 
-Use this skill to capture a durable, verified session handoff record through the `kedu`
+Use this skill to capture a durable, verified session handoff record through the `qiju`
 CLI. Trigger it when the user asks to save, checkpoint, remember, or hand off project
-context, or invokes `/kedu-log`.
+context, or invokes `/qiju-log`.
 
 ## Steps
 
@@ -128,47 +74,137 @@ context, or invokes `/kedu-log`.
    - `next_steps`: actionable remaining items.
    - `body_md`: full human-readable markdown narrative. Do not shorten it to save space —
      the body is the handoff; storage is negligible.
-2. Write that JSON object to `.kedu/kedu-entry.json` INSIDE the workspace. Never write it
+2. Write that JSON object to `.qiju/qiju-entry.json` INSIDE the workspace. Never write it
    to `/tmp` (some hosts reject writes outside the workspace).
 3. Run:
 
    ```bash
-   kedu log --source manual --agent {{agent}} --project <project> --body .kedu/kedu-entry.json
+   qiju log --source manual --agent {{agent}} --project <project> --body .qiju/qiju-entry.json
    ```
-4. Remove `.kedu/kedu-entry.json` after a successful log.
+4. Remove `.qiju/qiju-entry.json` after a successful log.
 5. Report the returned record id.
 
 {SENSITIVE_DATA_WARNING}
 
-{KEDU_PRIORITY}
+{QIJU_PRIORITY}
 
 {LEGACY_MEMORY_OVERRIDE}
 """
 
+QIJU_REVIEW_BODY = """# Qiju Review
+
+## Overview
+
+Use this skill to turn recent Qiju session records into practical skill and prompt improvements. Focus on mistakes, missed guardrails, unclear instructions, repeated friction, and lessons that should change how future work is guided.
+
+Do not edit any skill files unless the user explicitly asks. Produce recommendations and proposed wording only.
+
+## Collect Records
+
+Use Qiju records as the evidence source. Platform memory is background only unless the user explicitly verifies it.
+
+1. Compute the 7-day window from the current date and timezone. State the exact `--since` and `--until` dates used.
+2. Read both project and global records:
+   - Project records: `qiju search --scope current_project --since <date> --until <date> --format summary --limit <N>`
+   - Global/cross-project records: `qiju search --scope all --since <date> --until <date> --format summary --limit <N>`
+3. Hydrate relevant records with `qiju show <id>` when the summary suggests a mistake, unresolved issue, repeated fix cycle, prompt confusion, verification failure, or skill-related lesson.
+4. Prefer Qiju's own flags such as `--fields`, `--format`, `--ids-only`, `--since`, `--until`, and `--limit`. Do not pipe Qiju output through ad hoc text-processing commands when Qiju can shape the output directly.
+5. If the Qiju CLI shape is unclear, inspect `qiju search --help` or use the local `qiju-search` skill if available.
+
+## Extract Lessons
+
+Look for evidence-backed patterns, not isolated annoyances. Treat something as skill-worthy when it is recurring, high-impact, easy to prevent with guidance, or caused by unclear existing instructions.
+
+Extract:
+
+- Mistakes: wrong assumptions, broken commands, missed permissions, destructive-risk moments, skipped verification, wrong source of truth, poor handoff quality.
+- Lessons learned: what future Codex should do differently in similar work.
+- Skill or prompt causes: instructions that were ambiguous, missing, too broad, too narrow, stale, unused, or counterproductive.
+- Positive guardrails: existing prompts or skills that prevented mistakes and should be kept.
+
+Avoid overfitting:
+
+- Do not recommend changing a skill from one weak signal unless the impact was severe.
+- Do not blame a skill when the record points to missing project context, user preference, external failure, or one-off environment trouble.
+- Do not invent missing record details. Mark gaps as "unknown from records."
+
+## Recommendation Types
+
+For each candidate improvement, choose one:
+
+- `add`: Add a guardrail, verification step, source-of-truth reminder, or output format requirement.
+- `rewrite`: Make an unclear prompt more specific, shorter, or easier to follow.
+- `remove`: Delete guidance that caused wasted work, conflict, or repeated confusion.
+- `split`: Move bulky or conditional guidance into a separate reference or narrower skill.
+- `keep`: Preserve useful guidance and explain why no change is needed.
+- `monitor`: Watch for another week before changing anything.
+
+When recommending new or rewritten prompt text, make it copy-ready and scoped. Prefer imperative instructions over explanations.
+
+## Output Format
+
+Produce a concise report:
+
+```markdown
+# 7-Day Qiju Review
+
+Window: <start date> to <end date>
+Sources: <project/current_project count>, <global/all count>, <hydrated record ids>
+
+## Recurring Mistakes and Lessons
+- Pattern:
+  Evidence:
+  Lesson:
+  Skill relevance:
+
+## Skill and Prompt Recommendations
+- Target:
+  Type: add | rewrite | remove | split | keep | monitor
+  Why:
+  Suggested wording:
+  Confidence: high | medium | low
+
+## Do Not Change
+- Target:
+  Reason:
+
+## Highest-Leverage Next Edits
+1. ...
+2. ...
+3. ...
+```
+
+Keep the report evidence-first. Mention record ids or titles where useful, but avoid copying secrets, credentials, PII, or sensitive operational details from records.
+
+## Optional Follow-Up
+
+If the user asks to apply recommendations, edit only the targeted skill files, validate any changed skills, and record the change with Qiju when appropriate.
+"""
+
 # Shared search skill body — host-independent (no `{agent}` token).
-KEDU_SEARCH_BODY = f"""# Search Kedu Session Records
+QIJU_SEARCH_BODY = f"""# Search Qiju Session Records
 
-Use this skill to retrieve project history through the `kedu` CLI. Trigger it when the
+Use this skill to retrieve project history through the `qiju` CLI. Trigger it when the
 user asks about previous sessions, past decisions, unresolved bugs, what was already done,
-what's still pending, or invokes `/kedu-search`.
+what's still pending, or invokes `/qiju-search`.
 
-## Shape output with kedu's own flags
+## Shape output with qiju's own flags
 
-NEVER pipe `kedu` output through `python`, `jq`, `awk`, or `sed`. `kedu search` already
+NEVER pipe `qiju` output through `python`, `jq`, `awk`, or `sed`. `qiju search` already
 emits exactly the shape you need — ask it for that shape:
 
 - `--fields a,b,c` — keep only these fields, e.g. `--fields title,ts,next_steps`.
 - `--format json|jsonl|summary|table|actions` — pick the rendering. `summary` is one line
   per record; `table` is columnar; `actions` rolls up open next steps as a checklist.
-- `--ids-only` — return just ids (plus project/title) for a follow-up `kedu show <id>`.
+- `--ids-only` — return just ids (plus project/title) for a follow-up `qiju show <id>`.
 - `--limit N` — cap the number of results.
 
 Examples:
 
 ```bash
-kedu search --scope current_project --query "auth cookie" --format summary
-kedu search --scope current_project --fields title,ts --limit 5
-kedu search --scope current_project --ids-only --query "deploy"
+qiju search --scope current_project --query "auth cookie" --format summary
+qiju search --scope current_project --fields title,ts --limit 5
+qiju search --scope current_project --ids-only --query "deploy"
 ```
 
 ## Confirm the time range before a wide search
@@ -189,7 +225,7 @@ When the user asks "what's pending?" or "what are the open action items?", roll 
 outstanding next steps:
 
 ```bash
-kedu search --scope current_project --format actions
+qiju search --scope current_project --format actions
 ```
 
 ## Scope
@@ -198,33 +234,33 @@ Default to `--scope current_project`. Widen to `--scope all` only for cross-proj
 questions.
 
 ```bash
-kedu search --scope current_project --query "<terms>"
+qiju search --scope current_project --query "<terms>"
 ```
 
 ## Two-phase retrieval
 
-`kedu search` = **Phase 1: candidate identification.** Finds records and prints ids in
+`qiju search` = **Phase 1: candidate identification.** Finds records and prints ids in
 `<uuid>:N` form. Use `--ids-only` or `--format summary` for a cheap candidate manifest:
 
 ```bash
-kedu search --scope current_project --query "deploy" --ids-only   # Phase 1: candidate ids
+qiju search --scope current_project --query "deploy" --ids-only   # Phase 1: candidate ids
 ```
 
-`kedu show <uuid>:N` = **Phase 2: hydrate.** Fetches the full body of the chosen record:
+`qiju show <uuid>:N` = **Phase 2: hydrate.** Fetches the full body of the chosen record:
 
 ```bash
-kedu show "<uuid>:N"   # Phase 2: hydrate one record
+qiju show "<uuid>:N"   # Phase 2: hydrate one record
 ```
 
-**id-format rule:** ids are always `<uuid>:N`. Pass the id to `kedu show` EXACTLY as
-`kedu search` prints it, INCLUDING the `:N` suffix. A bare UUID (no `:N`) returns
+**id-format rule:** ids are always `<uuid>:N`. Pass the id to `qiju show` EXACTLY as
+`qiju search` prints it, INCLUDING the `:N` suffix. A bare UUID (no `:N`) returns
 'record not found'.
 
 **bare-UUID routing:** if you only hold a bare UUID (e.g. copied from a record-body
-cross-reference), do NOT call `kedu show` with it — run `kedu search` first to recover
+cross-reference), do NOT call `qiju show` with it — run `qiju search` first to recover
 the full `<uuid>:N` id. Never strip or guess `:N`.
 
-{KEDU_PRIORITY}
+{QIJU_PRIORITY}
 
 {LEGACY_MEMORY_OVERRIDE}
 """
@@ -233,22 +269,6 @@ the full `<uuid>:N` id. Never strip or guess `:N`.
 def _skill_md(name: str, description: str, body: str) -> str:
     """Render a SKILL.md with name+description frontmatter (Claude/Codex/Kiro format)."""
     return f"---\nname: {name}\ndescription: {description}\n---\n\n{body.strip()}\n"
-
-
-def _cursor_rule(log_body: str, search_body: str) -> str:
-    """Render a single Cursor rule combining both Kedu skill bodies.
-
-    Cursor has no slash-command skills; only the Cursor CLI is verified (IDE is
-    unverified), so both bodies live in one always-available-on-request rule.
-    """
-    description = (
-        "Kedu session records: how to save durable project context and how to search "
-        "previous sessions, decisions, and pending work through the kedu CLI."
-    )
-    return (
-        f"---\ndescription: {description}\nalwaysApply: false\n---\n\n"
-        f"{log_body.strip()}\n\n---\n\n{search_body.strip()}\n"
-    )
 
 
 class AgentDetectionError(ValueError):
@@ -261,7 +281,7 @@ class InitResult:
     host: str
     project: str | None
     project_root: str | None
-    kedu_home: str
+    qiju_home: str
     files: list[str]
     messages: list[str]
 
@@ -271,7 +291,7 @@ class InitResult:
             "host": self.host,
             "project": self.project,
             "project_root": self.project_root,
-            "kedu_home": self.kedu_home,
+            "qiju_home": self.qiju_home,
             "files": self.files,
             "messages": self.messages,
         }
@@ -320,7 +340,7 @@ def parse_hosts(value: str | None) -> tuple[str, ...]:
 
 
 def detect_current_agent(project_root: Path | None = None) -> str:
-    env_agent = canonical_agent(os.environ.get("KEDU_AGENT"))
+    env_agent = canonical_agent(os.environ.get("QIJU_AGENT"))
     if env_agent:
         return env_agent
 
@@ -370,83 +390,20 @@ def _write_file(path: Path, content: str) -> bool:
     return True
 
 
-def _kedu_cli_command() -> str:
-    home = paths_mod.kedu_home()
-    install_root = Path(os.environ.get("KEDU_INSTALL_ROOT", home / "kedu")).expanduser()
-    python_bin = install_root / ".venv" / "bin" / "python"
-    script = install_root / "scripts" / "kedu.py"
-    return f"{shlex.quote(str(python_bin))} {shlex.quote(str(script))}"
+def _qiju_log_skill(agent: str) -> str:
+    return _skill_md("qiju-log", QIJU_LOG_SKILL_DESCRIPTION, QIJU_LOG_BODY.format(agent=agent))
 
 
-def _kiro_agent_prompt() -> str:
-    command = _kedu_cli_command()
-    return f"""{KIRO_AGENT_BASE}
-
-## Kiro CLI Operation
-
-Kiro does not use automatic Kedu hooks. Do not promise automatic exit capture. Before
-quitting or when asked to save progress, explicitly save durable work with:
-
-```bash
-{command} log --source manual --agent kiro --project <project> --body .kedu/kedu-entry.json
-```
-
-Agent shells may not inherit the interactive `kedu` alias or PATH. If `kedu` is not
-available, use the full command path above.
-
-Write the temporary entry file inside the workspace, for example
-`.kedu/kedu-entry.json`, because Kiro may reject writes to `/tmp`. Remove that temp entry
-file after a successful log.
-"""
+def _qiju_search_skill() -> str:
+    return _skill_md("qiju-search", QIJU_SEARCH_SKILL_DESCRIPTION, QIJU_SEARCH_BODY)
 
 
-def _kiro_agent_config() -> str:
-    return json.dumps(
-        {
-            "name": "kedu",
-            "description": "Default Kiro agent with Kedu session handoff records enabled.",
-            "prompt": _kiro_agent_prompt(),
-            "mcpServers": {},
-            "tools": [
-                "read",
-                "write",
-                "shell",
-                "aws",
-                "report",
-                "introspect",
-                "knowledge",
-                "thinking",
-                "todo",
-                "delegate",
-                "grep",
-                "glob",
-            ],
-            "toolAliases": {},
-            "allowedTools": [],
-            "resources": [
-                "skill://.kiro/skills/*/SKILL.md",
-                "skill://~/.kiro/skills/*/SKILL.md",
-            ],
-            "hooks": {},
-            "toolsSettings": {},
-            "includeMcpJson": True,
-            "model": None,
-        },
-        ensure_ascii=False,
-        indent=2,
-    ) + "\n"
+def _qiju_review_skill() -> str:
+    return _skill_md("qiju-review", QIJU_REVIEW_SKILL_DESCRIPTION, QIJU_REVIEW_BODY)
 
 
-def _kedu_log_skill(agent: str) -> str:
-    return _skill_md("kedu-log", KEDU_LOG_SKILL_DESCRIPTION, KEDU_LOG_BODY.format(agent=agent))
-
-
-def _kedu_search_skill() -> str:
-    return _skill_md("kedu-search", KEDU_SEARCH_SKILL_DESCRIPTION, KEDU_SEARCH_BODY)
-
-
-def ensure_kedu_home() -> list[str]:
-    home = paths_mod.kedu_home()
+def ensure_qiju_home() -> list[str]:
+    home = paths_mod.qiju_home()
     files: list[str] = []
     for directory in ("long", "archive", "adapters", "agents"):
         path = home / directory
@@ -456,49 +413,61 @@ def ensure_kedu_home() -> list[str]:
 
 
 def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
-    files = ensure_kedu_home()
+    files = ensure_qiju_home()
     messages: list[str] = []
-    home = paths_mod.kedu_home()
+    home = paths_mod.qiju_home()
 
     if agent == "claude":
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
-        log_skill = _kedu_log_skill("claude")
-        search_skill = _kedu_search_skill()
+        log_skill = _qiju_log_skill("claude")
+        search_skill = _qiju_search_skill()
+        review_skill = _qiju_review_skill()
         targets = {
-            claude_home / "skills" / "kedu-log" / "SKILL.md": log_skill,
-            claude_home / "skills" / "kedu-search" / "SKILL.md": search_skill,
-            home / "agents" / "claude-kedu-log-skill.md": log_skill,
-            home / "agents" / "claude-kedu-search-skill.md": search_skill,
+            claude_home / "skills" / "qiju-log" / "SKILL.md": log_skill,
+            claude_home / "skills" / "qiju-search" / "SKILL.md": search_skill,
+            claude_home / "skills" / "qiju-review" / "SKILL.md": review_skill,
+            home / "agents" / "claude-qiju-log-skill.md": log_skill,
+            home / "agents" / "claude-qiju-search-skill.md": search_skill,
+            home / "agents" / "claude-qiju-review-skill.md": review_skill,
         }
     elif agent == "kiro":
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
-        kiro_agent_config = _kiro_agent_config()
-        log_skill = _kedu_log_skill("kiro")
-        search_skill = _kedu_search_skill()
+        log_skill = _qiju_log_skill("kiro")
+        search_skill = _qiju_search_skill()
+        review_skill = _qiju_review_skill()
         targets = {
-            kiro_home / "agents" / "kedu.json": kiro_agent_config,
-            kiro_home / "skills" / "kedu-log" / "SKILL.md": log_skill,
-            kiro_home / "skills" / "kedu-search" / "SKILL.md": search_skill,
-            home / "agents" / "kiro-kedu-agent.json": kiro_agent_config,
-            home / "agents" / "kiro-kedu-log-skill.md": log_skill,
-            home / "agents" / "kiro-kedu-search-skill.md": search_skill,
+            kiro_home / "skills" / "qiju-log" / "SKILL.md": log_skill,
+            kiro_home / "skills" / "qiju-search" / "SKILL.md": search_skill,
+            kiro_home / "skills" / "qiju-review" / "SKILL.md": review_skill,
+            home / "agents" / "kiro-qiju-log-skill.md": log_skill,
+            home / "agents" / "kiro-qiju-search-skill.md": search_skill,
+            home / "agents" / "kiro-qiju-review-skill.md": review_skill,
         }
     elif agent == "codex":
         agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
-        log_skill = _kedu_log_skill("codex")
-        search_skill = _kedu_search_skill()
+        log_skill = _qiju_log_skill("codex")
+        search_skill = _qiju_search_skill()
+        review_skill = _qiju_review_skill()
         targets = {
-            agent_home / ".agents" / "skills" / "kedu-log" / "SKILL.md": log_skill,
-            agent_home / ".agents" / "skills" / "kedu-search" / "SKILL.md": search_skill,
-            home / "agents" / "codex-kedu-log-skill.md": log_skill,
-            home / "agents" / "codex-kedu-search-skill.md": search_skill,
+            agent_home / ".agents" / "skills" / "qiju-log" / "SKILL.md": log_skill,
+            agent_home / ".agents" / "skills" / "qiju-search" / "SKILL.md": search_skill,
+            agent_home / ".agents" / "skills" / "qiju-review" / "SKILL.md": review_skill,
+            home / "agents" / "codex-qiju-log-skill.md": log_skill,
+            home / "agents" / "codex-qiju-search-skill.md": search_skill,
+            home / "agents" / "codex-qiju-review-skill.md": review_skill,
         }
     elif agent == "cursor":
         cursor_home = Path(os.environ.get("CURSOR_HOME", "~/.cursor")).expanduser()
-        cursor_rule = _cursor_rule(KEDU_LOG_BODY.format(agent="cursor"), KEDU_SEARCH_BODY)
+        log_skill = _qiju_log_skill("cursor")
+        search_skill = _qiju_search_skill()
+        review_skill = _qiju_review_skill()
         targets = {
-            cursor_home / "rules" / "kedu.mdc": cursor_rule,
-            home / "agents" / "cursor-kedu.mdc": cursor_rule,
+            cursor_home / "skills" / "qiju-log" / "SKILL.md": log_skill,
+            cursor_home / "skills" / "qiju-search" / "SKILL.md": search_skill,
+            cursor_home / "skills" / "qiju-review" / "SKILL.md": review_skill,
+            home / "agents" / "cursor-qiju-log-skill.md": log_skill,
+            home / "agents" / "cursor-qiju-search-skill.md": search_skill,
+            home / "agents" / "cursor-qiju-review-skill.md": review_skill,
         }
     else:  # pragma: no cover
         raise AgentDetectionError(f"unsupported agent: {agent}")
@@ -507,7 +476,7 @@ def init_global_agent(agent: str) -> tuple[list[str], list[str]]:
         _write_file(path, content)
         files.append(str(path))
 
-    messages.append(f"global {agent} Kedu integration enabled")
+    messages.append(f"global {agent} Qiju integration enabled")
     return sorted(dict.fromkeys(files)), messages
 
 
@@ -516,19 +485,19 @@ def add_git_info_exclude(project_root: Path) -> str | None:
     if not exclude.exists():
         return None
     content = exclude.read_text(encoding="utf-8")
-    if ".kedu/" not in content:
-        exclude.write_text(content.rstrip() + "\n.kedu/\n", encoding="utf-8")
+    if ".qiju/" not in content:
+        exclude.write_text(content.rstrip() + "\n.qiju/\n", encoding="utf-8")
     return str(exclude)
 
 
-def init_project_kedu(kedu_paths: paths_mod.KeduPaths, agent: str) -> list[str]:
-    paths_mod.ensure_base_dirs(kedu_paths)
-    files = [str(kedu_paths.project_kedu_dir)]
-    if not kedu_paths.short_jsonl.exists():
-        kedu_paths.short_jsonl.write_text("", encoding="utf-8")
-        files.append(str(kedu_paths.short_jsonl))
+def init_project_qiju(qiju_paths: paths_mod.QijuPaths, agent: str) -> list[str]:
+    paths_mod.ensure_base_dirs(qiju_paths)
+    files = [str(qiju_paths.project_qiju_dir)]
+    if not qiju_paths.short_jsonl.exists():
+        qiju_paths.short_jsonl.write_text("", encoding="utf-8")
+        files.append(str(qiju_paths.short_jsonl))
 
-    config_path = kedu_paths.project_kedu_dir / "config.json"
+    config_path = qiju_paths.project_qiju_dir / "config.json"
     now = util.utcish_now_iso()
     existing: dict[str, Any] = {}
     if config_path.exists():
@@ -545,8 +514,8 @@ def init_project_kedu(kedu_paths: paths_mod.KeduPaths, agent: str) -> list[str]:
     enabled_agents.add(agent)
     config = {
         "schema_version": INIT_SCHEMA_VERSION,
-        "project": kedu_paths.project,
-        "kedu_home": str(kedu_paths.home),
+        "project": qiju_paths.project,
+        "qiju_home": str(qiju_paths.home),
         "enabled_agents": sorted(enabled_agents),
         "default_agent": existing.get("default_agent", agent),
         "created_at": existing.get("created_at", now),
@@ -555,52 +524,61 @@ def init_project_kedu(kedu_paths: paths_mod.KeduPaths, agent: str) -> list[str]:
     _write_file(config_path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
     files.append(str(config_path))
 
-    exclude = add_git_info_exclude(kedu_paths.project_root)
+    exclude = add_git_info_exclude(qiju_paths.project_root)
     if exclude:
         files.append(exclude)
     return files
 
 
-def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path | None = None) -> tuple[paths_mod.KeduPaths, list[str], list[str]]:
-    kedu_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
-    files = init_project_kedu(kedu_paths, agent)
+def init_local_agent(agent: str, *, project: str | None = None, cwd: str | Path | None = None) -> tuple[paths_mod.QijuPaths, list[str], list[str]]:
+    qiju_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
+    files = init_project_qiju(qiju_paths, agent)
     messages: list[str] = []
 
     if agent == "claude":
-        skills_dir = kedu_paths.project_root / ".claude" / "skills"
-        log_skill = skills_dir / "kedu-log" / "SKILL.md"
-        search_skill = skills_dir / "kedu-search" / "SKILL.md"
-        _write_file(log_skill, _kedu_log_skill("claude"))
-        _write_file(search_skill, _kedu_search_skill())
-        files.extend([str(log_skill), str(search_skill)])
+        skills_dir = qiju_paths.project_root / ".claude" / "skills"
+        log_skill = skills_dir / "qiju-log" / "SKILL.md"
+        search_skill = skills_dir / "qiju-search" / "SKILL.md"
+        review_skill = skills_dir / "qiju-review" / "SKILL.md"
+        _write_file(log_skill, _qiju_log_skill("claude"))
+        _write_file(search_skill, _qiju_search_skill())
+        _write_file(review_skill, _qiju_review_skill())
+        files.extend([str(log_skill), str(search_skill), str(review_skill)])
     elif agent == "kiro":
-        cli_agent = kedu_paths.project_root / ".kiro" / "agents" / "kedu.json"
-        skills_dir = kedu_paths.project_root / ".kiro" / "skills"
-        log_skill = skills_dir / "kedu-log" / "SKILL.md"
-        search_skill = skills_dir / "kedu-search" / "SKILL.md"
-        _write_file(cli_agent, _kiro_agent_config())
-        _write_file(log_skill, _kedu_log_skill("kiro"))
-        _write_file(search_skill, _kedu_search_skill())
-        files.extend([str(cli_agent), str(log_skill), str(search_skill)])
+        skills_dir = qiju_paths.project_root / ".kiro" / "skills"
+        log_skill = skills_dir / "qiju-log" / "SKILL.md"
+        search_skill = skills_dir / "qiju-search" / "SKILL.md"
+        review_skill = skills_dir / "qiju-review" / "SKILL.md"
+        _write_file(log_skill, _qiju_log_skill("kiro"))
+        _write_file(search_skill, _qiju_search_skill())
+        _write_file(review_skill, _qiju_review_skill())
+        files.extend([str(log_skill), str(search_skill), str(review_skill)])
     elif agent == "codex":
-        skills_dir = kedu_paths.project_root / ".agents" / "skills"
-        log_skill = skills_dir / "kedu-log" / "SKILL.md"
-        search_skill = skills_dir / "kedu-search" / "SKILL.md"
-        _write_file(log_skill, _kedu_log_skill("codex"))
-        _write_file(search_skill, _kedu_search_skill())
-        files.extend([str(log_skill), str(search_skill)])
+        skills_dir = qiju_paths.project_root / ".agents" / "skills"
+        log_skill = skills_dir / "qiju-log" / "SKILL.md"
+        search_skill = skills_dir / "qiju-search" / "SKILL.md"
+        review_skill = skills_dir / "qiju-review" / "SKILL.md"
+        _write_file(log_skill, _qiju_log_skill("codex"))
+        _write_file(search_skill, _qiju_search_skill())
+        _write_file(review_skill, _qiju_review_skill())
+        files.extend([str(log_skill), str(search_skill), str(review_skill)])
     elif agent == "cursor":
-        target = kedu_paths.project_root / ".cursor" / "rules" / "kedu.mdc"
-        _write_file(target, _cursor_rule(KEDU_LOG_BODY.format(agent="cursor"), KEDU_SEARCH_BODY))
-        files.append(str(target))
+        skills_dir = qiju_paths.project_root / ".cursor" / "skills"
+        log_skill = skills_dir / "qiju-log" / "SKILL.md"
+        search_skill = skills_dir / "qiju-search" / "SKILL.md"
+        review_skill = skills_dir / "qiju-review" / "SKILL.md"
+        _write_file(log_skill, _qiju_log_skill("cursor"))
+        _write_file(search_skill, _qiju_search_skill())
+        _write_file(review_skill, _qiju_review_skill())
+        files.extend([str(log_skill), str(search_skill), str(review_skill)])
     else:  # pragma: no cover
         raise AgentDetectionError(f"unsupported agent: {agent}")
 
-    messages.append(f"local {agent} Kedu integration enabled for {kedu_paths.project}")
-    return kedu_paths, sorted(dict.fromkeys(files)), messages
+    messages.append(f"local {agent} Qiju integration enabled for {qiju_paths.project}")
+    return qiju_paths, sorted(dict.fromkeys(files)), messages
 
 
-def init_kedu(
+def init_qiju(
     *,
     mode: str,
     agent: str | None = None,
@@ -620,18 +598,18 @@ def init_kedu(
             host=resolved_agent,
             project=None,
             project_root=None,
-            kedu_home=str(paths_mod.kedu_home()),
+            qiju_home=str(paths_mod.qiju_home()),
             files=files,
             messages=messages,
         )
 
-    kedu_paths, files, messages = init_local_agent(resolved_agent, project=project, cwd=cwd)
+    qiju_paths, files, messages = init_local_agent(resolved_agent, project=project, cwd=cwd)
     return InitResult(
         mode=mode,
         host=resolved_agent,
-        project=kedu_paths.project,
-        project_root=str(kedu_paths.project_root),
-        kedu_home=str(kedu_paths.home),
+        project=qiju_paths.project,
+        project_root=str(qiju_paths.project_root),
+        qiju_home=str(qiju_paths.home),
         files=files,
         messages=messages,
     )

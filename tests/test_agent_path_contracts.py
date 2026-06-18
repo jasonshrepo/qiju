@@ -1,6 +1,6 @@
 """Agent path contracts — the executable form of the RELEASE.md Smoke Matrix.
 
-Each test asserts that `kedu init` writes its files to the EXACT path the real agent
+Each test asserts that `qiju init` writes its files to the EXACT path the real agent
 reads, with a comment citing the vendor doc that defines that path. These are the tests
 that would have caught the Codex skill-path bug (init wrote ~/.codex/skills, but Codex
 reads ~/.agents/skills).
@@ -39,26 +39,28 @@ def _assert_skill_frontmatter(path: Path, *, name: str) -> str:
     return text
 
 
-def test_contract_claude_local(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="claude", cwd=project)
+def test_contract_claude_local(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="claude", cwd=project)
     skills = project / ".claude" / "skills"
-    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
-    # Skill-first: no CLAUDE.md block written, no unified /kedu skill.
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
+    # Skill-first: no CLAUDE.md block written, no unified /qiju skill.
     assert not (project / "CLAUDE.md").exists()
-    assert not (skills / "kedu" / "SKILL.md").exists()
+    assert not (skills / "qiju" / "SKILL.md").exists()
 
 
-def test_contract_claude_global(kedu_env, monkeypatch, tmp_path):
+def test_contract_claude_global(qiju_env, monkeypatch, tmp_path):
     claude_home = tmp_path / "claude-home"
     monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
-    init_cmd.init_kedu(mode="global", agent="claude", cwd=kedu_env["project"])
+    init_cmd.init_qiju(mode="global", agent="claude", cwd=qiju_env["project"])
     skills = claude_home / "skills"
-    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
     assert not (claude_home / "CLAUDE.md").exists()
-    assert not (skills / "kedu" / "SKILL.md").exists()
+    assert not (skills / "qiju" / "SKILL.md").exists()
 
 
 # --------------------------------------------------------------------------------------
@@ -66,170 +68,198 @@ def test_contract_claude_global(kedu_env, monkeypatch, tmp_path):
 # Contract: repo-scope skills at <repo>/.agents/skills/<name>/SKILL.md, user-scope at
 # ~/.agents/skills/<name>/SKILL.md. SKILL.md must carry name+description frontmatter.
 # https://developers.openai.com/codex/skills
-# Regression guards: Codex does NOT read ~/.codex/skills, and Kedu no longer writes
+# Regression guards: Codex does NOT read ~/.codex/skills, and Qiju no longer writes
 # AGENTS.md (it duplicated Kiro steering and is not the Codex-native mechanism).
 # --------------------------------------------------------------------------------------
 
-def test_contract_codex_local(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+def test_contract_codex_local(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="codex", cwd=project)
     skills = project / ".agents" / "skills"
-    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
     assert not (project / "AGENTS.md").exists()
-    assert not (skills / "kedu" / "SKILL.md").exists()
+    assert not (skills / "qiju" / "SKILL.md").exists()
 
 
-def test_contract_codex_global(kedu_env, monkeypatch, tmp_path):
+def test_contract_codex_global(qiju_env, monkeypatch, tmp_path):
     agent_home = tmp_path / "agent-home"
     codex_home = tmp_path / "codex-home"
     monkeypatch.setenv("AGENT_HOME", str(agent_home))
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
-    init_cmd.init_kedu(mode="global", agent="codex", cwd=kedu_env["project"])
+    init_cmd.init_qiju(mode="global", agent="codex", cwd=qiju_env["project"])
     skills = agent_home / ".agents" / "skills"
-    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
     # Regression guards for the original bug:
-    assert not (codex_home / "skills" / "kedu").exists()
+    assert not (codex_home / "skills" / "qiju").exists()
+    assert not (codex_home / "skills" / "qiju-log").exists()
+    assert not (codex_home / "skills" / "qiju-search").exists()
+    assert not (codex_home / "skills" / "qiju-review").exists()
     assert not (codex_home / "AGENTS.md").exists()
 
 
-def test_contract_codex_skill_has_required_frontmatter(kedu_env):
+def test_contract_codex_skill_has_required_frontmatter(qiju_env):
     # https://developers.openai.com/codex/skills: "The SKILL.md file must include name
     # and description." Both skills must carry it, and the log skill must resolve the
     # {agent} token to the codex identity.
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="codex", cwd=project)
     log_text = _assert_skill_frontmatter(
-        project / ".agents" / "skills" / "kedu-log" / "SKILL.md", name="kedu-log"
+        project / ".agents" / "skills" / "qiju-log" / "SKILL.md", name="qiju-log"
     )
     assert "--agent codex" in log_text
     assert "{agent}" not in log_text
     _assert_skill_frontmatter(
-        project / ".agents" / "skills" / "kedu-search" / "SKILL.md", name="kedu-search"
+        project / ".agents" / "skills" / "qiju-search" / "SKILL.md", name="qiju-search"
+    )
+    _assert_skill_frontmatter(
+        project / ".agents" / "skills" / "qiju-review" / "SKILL.md", name="qiju-review"
     )
 
 
 # --------------------------------------------------------------------------------------
 # Kiro
-# Contract: SKILL-FIRST. CLI agent at .kiro/agents/<name>.json and Agent Skill at
-# .kiro/skills/<name>/SKILL.md (the `/kedu` slash command, used by both IDE and CLI).
-# The CLI agent registers the skill through its `resources` field. User-level under
-# ~/.kiro/. NO steering file is written (always-on steering made Kiro IDE unreliable at
-# writing records), and the old .kiro/prompts/ saved prompt is retired.
+# Contract: provider-neutral Agent Skills only. Project skills live at
+# .kiro/skills/<name>/SKILL.md and user skills under ~/.kiro/skills/<name>/SKILL.md.
+# Qiju does not ship or generate a provider-specific .kiro/agents/qiju.json config,
+# and the old .kiro/prompts/ saved prompt is retired.
 # --------------------------------------------------------------------------------------
 
-def test_contract_kiro_local(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
-    assert (project / ".kiro" / "agents" / "kedu.json").exists()
+def test_contract_kiro_local(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="kiro", cwd=project)
     skills = project / ".kiro" / "skills"
-    log_text = _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
+    log_text = _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
     assert "--agent kiro" in log_text
     assert "{agent}" not in log_text
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
-    assert not (skills / "kedu" / "SKILL.md").exists()
-    assert not (project / ".kiro" / "steering" / "kedu.md").exists()
-    assert not (project / ".kiro" / "prompts" / "kedu-agent-prompt.md").exists()
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
+    assert not (skills / "qiju" / "SKILL.md").exists()
+    assert not (project / ".kiro" / "agents" / "qiju.json").exists()
+    assert not (project / ".kiro" / "steering" / "qiju.md").exists()
+    assert not (project / ".kiro" / "prompts" / "qiju-agent-prompt.md").exists()
 
 
-def test_contract_kiro_global(kedu_env, monkeypatch, tmp_path):
+def test_contract_kiro_global(qiju_env, monkeypatch, tmp_path):
     kiro_home = tmp_path / "kiro-home"
     monkeypatch.setenv("KIRO_HOME", str(kiro_home))
-    init_cmd.init_kedu(mode="global", agent="kiro", cwd=kedu_env["project"])
-    assert (kiro_home / "agents" / "kedu.json").exists()
+    init_cmd.init_qiju(mode="global", agent="kiro", cwd=qiju_env["project"])
     skills = kiro_home / "skills"
-    _assert_skill_frontmatter(skills / "kedu-log" / "SKILL.md", name="kedu-log")
-    _assert_skill_frontmatter(skills / "kedu-search" / "SKILL.md", name="kedu-search")
-    assert not (skills / "kedu" / "SKILL.md").exists()
-    assert not (kiro_home / "steering" / "kedu.md").exists()
-    assert not (kiro_home / "prompts" / "kedu-agent-prompt.md").exists()
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
+    assert not (skills / "qiju" / "SKILL.md").exists()
+    assert not (kiro_home / "agents" / "qiju.json").exists()
+    assert not (kiro_home / "steering" / "qiju.md").exists()
+    assert not (kiro_home / "prompts" / "qiju-agent-prompt.md").exists()
 
 
 # --------------------------------------------------------------------------------------
 # Cursor
-# Contract: rules at .cursor/rules/<name>.mdc (project) and ~/.cursor/rules/ (user).
-# https://docs.cursor.com/context/rules
+# Contract: project skills at .cursor/skills/<name>/SKILL.md and user skills at
+# ~/.cursor/skills/<name>/SKILL.md.
+# https://cursor.com/docs/skills
 # --------------------------------------------------------------------------------------
 
-def test_contract_cursor_local(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="cursor", cwd=project)
-    rule = project / ".cursor" / "rules" / "kedu.mdc"
-    assert rule.exists()
-    # Cursor has no slash-command skills: one rule carries BOTH bodies.
-    text = rule.read_text(encoding="utf-8")
-    assert "alwaysApply: false" in text
-    assert "Save a Kedu Session Record" in text  # log body
-    assert "Search Kedu Session Records" in text  # search body
-    assert "--agent cursor" in text
+def test_contract_cursor_local(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="cursor", cwd=project)
+    skills = project / ".cursor" / "skills"
+    log_text = _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
+    assert "--agent cursor" in log_text
+    assert not (project / ".cursor" / "rules" / "qiju.mdc").exists()
 
 
-def test_contract_cursor_global(kedu_env, monkeypatch, tmp_path):
+def test_contract_cursor_global(qiju_env, monkeypatch, tmp_path):
     cursor_home = tmp_path / "cursor-home"
     monkeypatch.setenv("CURSOR_HOME", str(cursor_home))
-    init_cmd.init_kedu(mode="global", agent="cursor", cwd=kedu_env["project"])
-    assert (cursor_home / "rules" / "kedu.mdc").exists()
+    init_cmd.init_qiju(mode="global", agent="cursor", cwd=qiju_env["project"])
+    skills = cursor_home / "skills"
+    _assert_skill_frontmatter(skills / "qiju-log" / "SKILL.md", name="qiju-log")
+    _assert_skill_frontmatter(skills / "qiju-search" / "SKILL.md", name="qiju-search")
+    _assert_skill_frontmatter(skills / "qiju-review" / "SKILL.md", name="qiju-review")
+    assert not (cursor_home / "rules" / "qiju.mdc").exists()
 
 
 # --------------------------------------------------------------------------------------
 # Uninstall round-trip
-# Contract: what `kedu init` creates, `kedu uninstall` removes — except records.
+# Contract: what `qiju init` creates, `qiju uninstall` removes — except records.
 # (RELEASE.md §E/§F.) These assert the project-scope agent file created by init is gone
 # after uninstall, and that durable records survive.
 # --------------------------------------------------------------------------------------
 
-def test_contract_codex_uninstall_removes_skill(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+def test_contract_codex_uninstall_removes_skill(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="codex", cwd=project)
     skills = project / ".agents" / "skills"
-    assert (skills / "kedu-log" / "SKILL.md").exists()
-    assert (skills / "kedu-search" / "SKILL.md").exists()
+    assert (skills / "qiju-log" / "SKILL.md").exists()
+    assert (skills / "qiju-search" / "SKILL.md").exists()
+    assert (skills / "qiju-review" / "SKILL.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("codex",), dry_run=False)
-    assert not (skills / "kedu-log").exists()
-    assert not (skills / "kedu-search").exists()
+    assert not (skills / "qiju-log").exists()
+    assert not (skills / "qiju-search").exists()
+    assert not (skills / "qiju-review").exists()
 
 
-def test_contract_claude_uninstall_removes_skill(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="claude", cwd=project)
+def test_contract_claude_uninstall_removes_skill(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="claude", cwd=project)
     skills = project / ".claude" / "skills"
-    assert (skills / "kedu-log" / "SKILL.md").exists()
-    assert (skills / "kedu-search" / "SKILL.md").exists()
+    assert (skills / "qiju-log" / "SKILL.md").exists()
+    assert (skills / "qiju-search" / "SKILL.md").exists()
+    assert (skills / "qiju-review" / "SKILL.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("claude",), dry_run=False)
-    assert not (skills / "kedu-log").exists()
-    assert not (skills / "kedu-search").exists()
+    assert not (skills / "qiju-log").exists()
+    assert not (skills / "qiju-search").exists()
+    assert not (skills / "qiju-review").exists()
 
 
-def test_contract_kiro_uninstall_removes_skill_and_agent(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="kiro", cwd=project)
-    cli_agent = project / ".kiro" / "agents" / "kedu.json"
+def test_contract_kiro_uninstall_removes_skill_and_legacy_agent(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="kiro", cwd=project)
+    cli_agent = project / ".kiro" / "agents" / "qiju.json"
     skills = project / ".kiro" / "skills"
-    # Skill-first init creates the CLI agent and the two skills, not a steering file.
-    assert cli_agent.exists()
-    assert (skills / "kedu-log" / "SKILL.md").exists()
-    assert (skills / "kedu-search" / "SKILL.md").exists()
-    assert not (project / ".kiro" / "steering" / "kedu.md").exists()
+    # Init creates only portable skills. Cleanup still purges legacy Kiro agent configs.
+    assert not cli_agent.exists()
+    cli_agent.parent.mkdir(parents=True)
+    cli_agent.write_text('{"name":"qiju","description":"Qiju legacy agent"}\n', encoding="utf-8")
+    assert (skills / "qiju-log" / "SKILL.md").exists()
+    assert (skills / "qiju-search" / "SKILL.md").exists()
+    assert (skills / "qiju-review" / "SKILL.md").exists()
+    assert not (project / ".kiro" / "steering" / "qiju.md").exists()
     cleanup.cleanup(user=False, project_root=project, hosts=("kiro",), dry_run=False)
     assert not cli_agent.exists()
-    assert not (skills / "kedu-log").exists()
-    assert not (skills / "kedu-search").exists()
+    assert not (skills / "qiju-log").exists()
+    assert not (skills / "qiju-search").exists()
+    assert not (skills / "qiju-review").exists()
 
 
-def test_contract_cursor_uninstall_removes_rule(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="cursor", cwd=project)
-    rule = project / ".cursor" / "rules" / "kedu.mdc"
-    assert rule.exists()
+def test_contract_cursor_uninstall_removes_skills_and_legacy_rule(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="cursor", cwd=project)
+    skills = project / ".cursor" / "skills"
+    assert (skills / "qiju-log" / "SKILL.md").exists()
+    assert (skills / "qiju-search" / "SKILL.md").exists()
+    assert (skills / "qiju-review" / "SKILL.md").exists()
+    legacy_rule = project / ".cursor" / "rules" / "qiju.mdc"
+    legacy_rule.parent.mkdir(parents=True)
+    legacy_rule.write_text("Qiju legacy rule\n", encoding="utf-8")
     cleanup.cleanup(user=False, project_root=project, hosts=("cursor",), dry_run=False)
-    assert not rule.exists()
+    assert not (skills / "qiju-log").exists()
+    assert not (skills / "qiju-search").exists()
+    assert not (skills / "qiju-review").exists()
+    assert not legacy_rule.exists()
 
 
 # --------------------------------------------------------------------------------------
 # Session-record path resolution
-# Contract: a record's identity and storage location are anchored to where `kedu init`
-# ran (the `.kedu/config.json` marker), NOT to the agent's cwd at log time. Agents wander
+# Contract: a record's identity and storage location are anchored to where `qiju init`
+# ran (the `.qiju/config.json` marker), NOT to the agent's cwd at log time. Agents wander
 # into subfolders; the short tier must still land at the init root. These guard the bug
 # where logging from a subdir created a second project identity (slug + short.jsonl) in
 # that subdir.
@@ -241,24 +271,24 @@ def _minimal_entry(**overrides):
     return entry
 
 
-def test_log_from_subdir_resolves_to_init_root(kedu_env, monkeypatch):
-    monkeypatch.delenv("KEDU_PROJECT_ROOT", raising=False)
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="claude", cwd=project)
+def test_log_from_subdir_resolves_to_init_root(qiju_env, monkeypatch):
+    monkeypatch.delenv("QIJU_PROJECT_ROOT", raising=False)
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="claude", cwd=project)
     sub = project / "development"
     sub.mkdir()
 
     capture.log_entry(_minimal_entry(), source="manual", agent="claude", cwd=sub)
 
     # Short tier lands at the init root, not the subdir the agent wandered into.
-    assert (project / ".kedu" / "short.jsonl").read_text(encoding="utf-8").strip()
-    assert not (sub / ".kedu").exists()
+    assert (project / ".qiju" / "short.jsonl").read_text(encoding="utf-8").strip()
+    assert not (sub / ".qiju").exists()
     # Identity is the init-root slug ("repo"), so the long file matches.
-    assert (kedu_env["home"] / "long" / "repo.jsonl").exists()
+    assert (qiju_env["home"] / "long" / "repo.jsonl").exists()
 
 
-def test_log_without_marker_aborts(kedu_env, monkeypatch, tmp_path):
-    monkeypatch.delenv("KEDU_PROJECT_ROOT", raising=False)
+def test_log_without_marker_aborts(qiju_env, monkeypatch, tmp_path):
+    monkeypatch.delenv("QIJU_PROJECT_ROOT", raising=False)
     bare = tmp_path / "no-init-here"
     bare.mkdir()
     # No init marker, no --project, cwd fallback -> refuse to mint a new identity.
@@ -266,20 +296,20 @@ def test_log_without_marker_aborts(kedu_env, monkeypatch, tmp_path):
         capture.log_entry(_minimal_entry(), source="manual", agent="claude", cwd=bare)
 
 
-def test_env_var_overrides_cwd(kedu_env, monkeypatch, tmp_path):
+def test_env_var_overrides_cwd(qiju_env, monkeypatch, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    monkeypatch.setenv("KEDU_PROJECT_ROOT", str(kedu_env["project"]))
+    monkeypatch.setenv("QIJU_PROJECT_ROOT", str(qiju_env["project"]))
     resolved = paths.resolve_paths(cwd=elsewhere)
     assert resolved.root_origin == "env"
-    assert resolved.project_root == kedu_env["project"].resolve()
+    assert resolved.project_root == qiju_env["project"].resolve()
 
 
-def test_slug_stable_after_root_rename(kedu_env, monkeypatch):
-    monkeypatch.delenv("KEDU_PROJECT_ROOT", raising=False)
-    project = kedu_env["project"]
+def test_slug_stable_after_root_rename(qiju_env, monkeypatch):
+    monkeypatch.delenv("QIJU_PROJECT_ROOT", raising=False)
+    project = qiju_env["project"]
     # Init pins a canonical slug into the marker, independent of the directory name.
-    init_cmd.init_kedu(mode="local", agent="claude", project="canonical-name", cwd=project)
+    init_cmd.init_qiju(mode="local", agent="claude", project="canonical-name", cwd=project)
     sub = project / "development"
     sub.mkdir()
     resolved = paths.resolve_paths(cwd=sub)
@@ -287,13 +317,13 @@ def test_slug_stable_after_root_rename(kedu_env, monkeypatch):
     assert resolved.root_origin == "marker"
 
 
-def test_contract_uninstall_preserves_records(kedu_env):
-    project = kedu_env["project"]
-    init_cmd.init_kedu(mode="local", agent="codex", cwd=project)
+def test_contract_uninstall_preserves_records(qiju_env):
+    project = qiju_env["project"]
+    init_cmd.init_qiju(mode="local", agent="codex", cwd=project)
     # A project short record and a global long record must both survive uninstall.
-    short = project / ".kedu" / "short.jsonl"
+    short = project / ".qiju" / "short.jsonl"
     short.write_text(json.dumps({"id": "session-1:1"}) + "\n", encoding="utf-8")
-    long_file = kedu_env["home"] / "long" / "repo.jsonl"
+    long_file = qiju_env["home"] / "long" / "repo.jsonl"
     long_file.parent.mkdir(parents=True, exist_ok=True)
     long_file.write_text(json.dumps({"id": "session-1:1"}) + "\n", encoding="utf-8")
 
@@ -305,35 +335,17 @@ def test_contract_uninstall_preserves_records(kedu_env):
 
 # --------------------------------------------------------------------------------------
 # Shipped templates vs generated behavior
-# Contract: the checked-in support templates under agents/kiro/ must not contradict what
-# `kedu init` generates. The Kiro integration is skill-first, so the shipped agent config
-# must register the skill via `resources` and must not claim "not a Kiro skill" or point
-# at the retired prompts path. Retired template files must be absent from the repo.
+# Contract: Qiju ships only provider-neutral skills/<name>/SKILL.md skill packages.
+# Provider-specific Kiro agent config files are not part of the active package.
 # --------------------------------------------------------------------------------------
 
-def test_release_template_kiro_agent_matches_generated():
+def test_release_template_has_no_kiro_agent_config():
     repo = _repo_root()
-    template_path = repo / "agents" / "kiro" / "agents" / "kedu.json"
-    assert template_path.exists()
-    template = json.loads(template_path.read_text(encoding="utf-8"))
-    generated = json.loads(init_cmd._kiro_agent_config())
-
-    # Static fields must match the generator.
-    assert template["resources"] == generated["resources"]
-    assert "skill://.kiro/skills/*/SKILL.md" in template["resources"]
-    assert template["name"] == generated["name"]
-    assert template["tools"] == generated["tools"]
-
-    # Skill-first prompt: no stale "not a Kiro skill" claim, must reference both skills,
-    # must not point at the retired saved-prompt path.
-    prompt = template["prompt"]
-    assert "not a Kiro skill" not in prompt
-    assert ".kiro/skills/kedu-log/SKILL.md" in prompt
-    assert ".kiro/skills/kedu-search/SKILL.md" in prompt
-    assert "kedu-agent-prompt" not in prompt
+    template_path = repo / "agents" / "kiro" / "agents" / "qiju.json"
+    assert not template_path.exists()
 
 
 def test_release_templates_retired_paths_absent():
     repo = _repo_root()
-    assert not (repo / "agents" / "kiro" / "prompts" / "kedu-agent-prompt.md").exists()
-    assert not (repo / "agents" / "kiro" / "steering" / "kedu.md").exists()
+    assert not (repo / "agents" / "kiro" / "prompts" / "qiju-agent-prompt.md").exists()
+    assert not (repo / "agents" / "kiro" / "steering" / "qiju.md").exists()

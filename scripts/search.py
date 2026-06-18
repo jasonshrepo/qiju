@@ -18,7 +18,7 @@ def _resolve_scope(scope: str, project: str | None, cwd: str | Path | None) -> l
     if scope == "current_project":
         return [current]
     if scope == "all":
-        projects = storage.all_projects(paths_mod.kedu_home())
+        projects = storage.all_projects(paths_mod.qiju_home())
         return projects or [current]
     projects = [paths_mod.slugify_project(part) for part in scope.split(",") if part.strip()]
     if not projects:
@@ -71,10 +71,29 @@ def _in_time_range(entry: dict[str, Any], since: str | None, until: str | None) 
     return True
 
 
+def _matches_session(entry: dict[str, Any], session: str | None) -> bool:
+    if not session:
+        return True
+    entry_id = str(entry.get("id", ""))
+    return entry_id.split(":", 1)[0] == session
+
+
+def _session_sort_key(entry: dict[str, Any]) -> tuple[int, str]:
+    entry_id = str(entry.get("id", ""))
+    _, sep, seq = entry_id.partition(":")
+    if sep:
+        try:
+            return (int(seq), entry_id)
+        except ValueError:
+            pass
+    return (0, entry_id)
+
+
 def search_entries(
     *,
     scope: str = "current_project",
     query: str | None = None,
+    session: str | None = None,
     project: str | None = None,
     cwd: str | Path | None = None,
     tags: list[str] | None = None,
@@ -92,18 +111,24 @@ def search_entries(
     tags = tags or []
     entries: list[dict[str, Any]] = []
     for project_name in projects:
-        kedu_paths = paths_mod.resolve_paths(project=project_name, cwd=cwd)
-        entries.extend(storage.read_project_entries(kedu_paths))
+        qiju_paths = paths_mod.resolve_paths(project=project_name, cwd=cwd)
+        entries.extend(storage.read_project_entries(qiju_paths))
 
     results: list[dict[str, Any]] = []
     seen: set[str] = set()
-    reverse = order != "asc"
-    for entry in sorted(entries, key=lambda item: str(item.get(sort, "")), reverse=reverse):
+    if session:
+        sorted_entries = sorted(entries, key=_session_sort_key)
+    else:
+        reverse = order != "asc"
+        sorted_entries = sorted(entries, key=lambda item: str(item.get(sort, "")), reverse=reverse)
+    for entry in sorted_entries:
         entry_id = str(entry.get("id", ""))
         if entry_id in seen:
             continue
         seen.add(entry_id)
         if str(entry.get("project", "")).lower() not in projects:
+            continue
+        if not _matches_session(entry, session):
             continue
         if source and entry.get("source") != source:
             continue

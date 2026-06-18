@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover
 def session_uuid(explicit: str | None = None) -> str:
     if explicit:
         return explicit
-    for key in ("KEDU_SESSION_ID", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID", "KIRO_SESSION_ID"):
+    for key in ("QIJU_SESSION_ID", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID", "KIRO_SESSION_ID"):
         value = os.environ.get(key)
         if value:
             return value

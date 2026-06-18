@@ -3,16 +3,16 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>org.kedu.maintain</string>
+  <string>org.qiju.maintain</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>KEDU_HOME</key>
-    <string>__KEDU_HOME__</string>
+    <key>QIJU_HOME</key>
+    <string>__QIJU_HOME__</string>
   </dict>
   <key>ProgramArguments</key>
   <array>
-    <string>__KEDU_PYTHON__</string>
-    <string>__KEDU_SCRIPT__</string>
+    <string>__QIJU_PYTHON__</string>
+    <string>__QIJU_SCRIPT__</string>
     <string>maintain</string>
   </array>
   <key>StartCalendarInterval</key>
@@ -23,8 +23,8 @@
     <integer>0</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>__LOG_DIR__/kedu-maintain.log</string>
+  <string>__LOG_DIR__/qiju-maintain.log</string>
   <key>StandardErrorPath</key>
-  <string>__LOG_DIR__/kedu-maintain.err</string>
+  <string>__LOG_DIR__/qiju-maintain.err</string>
 </dict>
 </plist>

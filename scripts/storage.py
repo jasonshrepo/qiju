@@ -11,36 +11,36 @@ except ImportError:  # pragma: no cover
     import util  # type: ignore
 
 
-def archive_files_for_project(kedu_paths: paths_mod.KeduPaths) -> list[Path]:
-    project_dir = kedu_paths.archive_dir / f"project={kedu_paths.project}"
+def archive_files_for_project(qiju_paths: paths_mod.QijuPaths) -> list[Path]:
+    project_dir = qiju_paths.archive_dir / f"project={qiju_paths.project}"
     if not project_dir.exists():
         return []
     return sorted(project_dir.glob("month=*/entries.parquet"))
 
 
-def read_archive_entries(kedu_paths: paths_mod.KeduPaths) -> list[dict[str, Any]]:
+def read_archive_entries(qiju_paths: paths_mod.QijuPaths) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    for parquet_path in archive_files_for_project(kedu_paths):
+    for parquet_path in archive_files_for_project(qiju_paths):
         entries.extend(archive.read_parquet(parquet_path))
     return entries
 
 
-def read_project_entries(kedu_paths: paths_mod.KeduPaths, include_short: bool = True) -> list[dict[str, Any]]:
+def read_project_entries(qiju_paths: paths_mod.QijuPaths, include_short: bool = True) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     if include_short:
-        entries.extend(util.read_jsonl(kedu_paths.short_jsonl))
-    entries.extend(util.read_jsonl(kedu_paths.long_jsonl))
-    entries.extend(read_archive_entries(kedu_paths))
+        entries.extend(util.read_jsonl(qiju_paths.short_jsonl))
+    entries.extend(util.read_jsonl(qiju_paths.long_jsonl))
+    entries.extend(read_archive_entries(qiju_paths))
     return util.stable_unique(entries)
 
 
-def id_locations(kedu_paths: paths_mod.KeduPaths, entry_id: str) -> set[str]:
+def id_locations(qiju_paths: paths_mod.QijuPaths, entry_id: str) -> set[str]:
     locations: set[str] = set()
-    if any(entry.get("id") == entry_id for entry in util.read_jsonl(kedu_paths.short_jsonl)):
+    if any(entry.get("id") == entry_id for entry in util.read_jsonl(qiju_paths.short_jsonl)):
         locations.add("short")
-    if any(entry.get("id") == entry_id for entry in util.read_jsonl(kedu_paths.long_jsonl)):
+    if any(entry.get("id") == entry_id for entry in util.read_jsonl(qiju_paths.long_jsonl)):
         locations.add("long")
-    for entry in read_archive_entries(kedu_paths):
+    for entry in read_archive_entries(qiju_paths):
         if entry.get("id") == entry_id:
             locations.add("archive")
             break
@@ -48,9 +48,9 @@ def id_locations(kedu_paths: paths_mod.KeduPaths, entry_id: str) -> set[str]:
 
 
 def all_projects(home: Path | None = None) -> list[str]:
-    home = home or paths_mod.kedu_home()
+    home = home or paths_mod.qiju_home()
     # Lowercase normalizes pre-migration files so the listing is canonical even before
-    # `kedu migrate` has run; dedup handles the case-insensitive FS single-file scenario.
+    # `qiju migrate` has run; dedup handles the case-insensitive FS single-file scenario.
     projects = {path.stem.lower() for path in paths_mod.all_long_files(home)}
     archive_dir = home / "archive"
     if archive_dir.exists():

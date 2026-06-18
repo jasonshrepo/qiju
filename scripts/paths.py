@@ -7,13 +7,13 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-# The init-only marker that anchors a project root. `kedu init` writes it; `kedu log`
-# never does, so stray `.kedu/` data dirs left in subfolders cannot hijack resolution.
-MARKER_REL = Path(".kedu") / "config.json"
+# The init-only marker that anchors a project root. `qiju init` writes it; `qiju log`
+# never does, so stray `.qiju/` data dirs left in subfolders cannot hijack resolution.
+MARKER_REL = Path(".qiju") / "config.json"
 
 
-def kedu_home() -> Path:
-    return Path(os.environ.get("KEDU_HOME", "~/.kedu")).expanduser()
+def qiju_home() -> Path:
+    return Path(os.environ.get("QIJU_HOME", "~/.qiju")).expanduser()
 
 
 def _find_root_marker(start: Path) -> Path | None:
@@ -44,12 +44,12 @@ def _git_toplevel(start: Path) -> Path | None:
 def resolve_root(cwd: str | Path | None = None) -> tuple[Path, str]:
     """Resolve the project root and report its origin.
 
-    Precedence: KEDU_PROJECT_ROOT env > nearest `.kedu/config.json` marker > git
-    toplevel > cwd fallback. The origin lets callers (notably `kedu log`) refuse to
+    Precedence: QIJU_PROJECT_ROOT env > nearest `.qiju/config.json` marker > git
+    toplevel > cwd fallback. The origin lets callers (notably `qiju log`) refuse to
     silently mint a new identity from a wandered cwd.
     """
     start = Path(cwd or os.getcwd()).resolve()
-    env = os.environ.get("KEDU_PROJECT_ROOT")
+    env = os.environ.get("QIJU_PROJECT_ROOT")
     if env:
         return Path(env).expanduser().resolve(), "env"
     marker = _find_root_marker(start)
@@ -94,19 +94,19 @@ def project_slug(project: str | None = None, cwd: str | Path | None = None) -> s
 
 
 @dataclass(frozen=True)
-class KeduPaths:
+class QijuPaths:
     project: str
     project_root: Path
     home: Path
     root_origin: str = "cwd"
 
     @property
-    def project_kedu_dir(self) -> Path:
-        return self.project_root / ".kedu"
+    def project_qiju_dir(self) -> Path:
+        return self.project_root / ".qiju"
 
     @property
     def short_jsonl(self) -> Path:
-        return self.project_kedu_dir / "short.jsonl"
+        return self.project_qiju_dir / "short.jsonl"
 
     @property
     def long_dir(self) -> Path:
@@ -126,13 +126,13 @@ class KeduPaths:
 
     @property
     def lock_file(self) -> Path:
-        return self.home / ".kedu.lock"
+        return self.home / ".qiju.lock"
 
     def archive_partition(self, month: str) -> Path:
         return self.archive_dir / f"project={self.project}" / f"month={month}" / "entries.parquet"
 
 
-def resolve_paths(project: str | None = None, cwd: str | Path | None = None) -> KeduPaths:
+def resolve_paths(project: str | None = None, cwd: str | Path | None = None) -> QijuPaths:
     root, origin = resolve_root(cwd)
     if project:
         slug = slugify_project(project)
@@ -141,17 +141,17 @@ def resolve_paths(project: str | None = None, cwd: str | Path | None = None) -> 
         # fall back to the directory name only when no marker is present.
         marker_slug = _read_marker_slug(root) if origin == "marker" else None
         slug = slugify_project(marker_slug) if marker_slug else slugify_project(root.name)
-    return KeduPaths(project=slug, project_root=root, home=kedu_home(), root_origin=origin)
+    return QijuPaths(project=slug, project_root=root, home=qiju_home(), root_origin=origin)
 
 
-def ensure_base_dirs(paths: KeduPaths) -> None:
-    paths.project_kedu_dir.mkdir(parents=True, exist_ok=True)
+def ensure_base_dirs(paths: QijuPaths) -> None:
+    paths.project_qiju_dir.mkdir(parents=True, exist_ok=True)
     paths.long_dir.mkdir(parents=True, exist_ok=True)
     paths.archive_dir.mkdir(parents=True, exist_ok=True)
 
 
 def all_long_files(home: Path | None = None) -> list[Path]:
-    long_dir = (home or kedu_home()) / "long"
+    long_dir = (home or qiju_home()) / "long"
     if not long_dir.exists():
         return []
     return sorted(long_dir.glob("*.jsonl"))

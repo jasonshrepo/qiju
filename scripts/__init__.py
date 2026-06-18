@@ -1,1 +1,1 @@
-"""Kedu implementation package."""
+"""Qiju implementation package."""

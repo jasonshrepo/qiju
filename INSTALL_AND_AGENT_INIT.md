@@ -1,8 +1,8 @@
 # Install And Host Init Model
 
-Kedu has two separate setup steps.
+QiJu has two separate setup steps.
 
-## 1. Install Kedu
+## 1. Install QiJu
 
 Run once per machine:
 
@@ -12,12 +12,12 @@ bash install.sh
 
 This installs:
 
-- `kedu` CLI
-- shared store at `~/.kedu`
-- installed engine copy at `~/.kedu/kedu`
-- shared support templates under `~/.kedu/agents`
+- `qiju` CLI
+- shared store at `~/.qiju`
+- installed engine copy at `~/.qiju/qiju`
+- shared support templates under `~/.qiju/agents`
 
-This step does not enable Kedu inside a specific project. The `kedu` command refers to the
+This step does not enable QiJu inside a specific project. The `qiju` command refers to the
 installed engine copy, so the downloaded installer checkout can be deleted after
 installation.
 
@@ -27,7 +27,7 @@ Project-local setup is the first/default step:
 
 ```bash
 cd /path/to/project
-kedu init --host codex
+qiju init --host codex
 ```
 
 Supported hosts:
@@ -40,69 +40,63 @@ Supported hosts:
 Optional user/global defaults can be added later:
 
 ```bash
-kedu init --host codex --global
+qiju init --host codex --global
 ```
 
-When called from inside a supported agent, `--host` may be omitted if Kedu can detect the
+When called from inside a supported agent, `--host` may be omitted if QiJu can detect the
 host from the environment or project markers:
 
 ```bash
-kedu init
+qiju init
 ```
 
 ## Scope Semantics
 
-Local init means "enable Kedu for this host in the current project." It creates:
+Local init means "enable QiJu for this host in the current project." It creates:
 
 ```text
-<project>/.kedu/
+<project>/.qiju/
 ├── short.jsonl
 └── config.json
 ```
 
-It also writes project-local host integration. Kedu is skill-first: each agent gets two
-explicit skills — `kedu-log` (save a record) and `kedu-search` (retrieve history) — with no
+It also writes project-local host integration. QiJu is skill-first: each agent gets three
+explicit skills — `qiju-log` (save a record), `qiju-search` (retrieve history), and
+`qiju-review` (review recent records for lessons) — with no
 always-on `CLAUDE.md` block and no `STATE.md`. The skills carry trigger-tuned descriptions
 so the agent auto-discovers them; they mandate nothing on init.
 
-- Claude: writes `.claude/skills/kedu-log/SKILL.md` and `.claude/skills/kedu-search/SKILL.md`. No `CLAUDE.md` block.
-- Codex: writes `.agents/skills/kedu-log/SKILL.md` and `.agents/skills/kedu-search/SKILL.md`.
-- Kiro: writes a Kiro CLI agent at `.kiro/agents/kedu.json` plus `.kiro/skills/kedu-log/SKILL.md` and `.kiro/skills/kedu-search/SKILL.md` (skill-first; no steering file and no saved prompt). The agent config registers both skills through its `resources` glob.
-- Cursor: writes one `.cursor/rules/kedu.mdc` containing both the log and search guidance. **Cursor IDE is unverified — only the Cursor CLI is tested.**
+- Claude: writes `.claude/skills/qiju-log/SKILL.md`, `.claude/skills/qiju-search/SKILL.md`, and `.claude/skills/qiju-review/SKILL.md`. No `CLAUDE.md` block.
+- Codex: writes `.agents/skills/qiju-log/SKILL.md`, `.agents/skills/qiju-search/SKILL.md`, and `.agents/skills/qiju-review/SKILL.md`.
+- Kiro: writes `.kiro/skills/qiju-log/SKILL.md`, `.kiro/skills/qiju-search/SKILL.md`, and `.kiro/skills/qiju-review/SKILL.md`. No Kiro agent config, no steering file, and no saved prompt.
+- Cursor: writes `.cursor/skills/qiju-log/SKILL.md`, `.cursor/skills/qiju-search/SKILL.md`, and `.cursor/skills/qiju-review/SKILL.md`.
 
-In Claude Code, Codex, and Kiro, invoke the skills directly:
+In Claude Code, Codex, Kiro, and Cursor, invoke the skills directly:
 
 ```text
-/kedu-log
-/kedu-search <query>
+/qiju-log
+/qiju-search <query>
+/qiju-review
 ```
 
-If the project is a git repo, `.kedu/` is added to `.git/info/exclude`, not `.gitignore`.
+If the project is a git repo, `.qiju/` is added to `.git/info/exclude`, not `.gitignore`.
 
 Global init means "install optional user-level defaults for this host." It is not required
-for a project to use Kedu.
+for a project to use QiJu.
 
-For Kiro CLI, local/global init makes a selectable `kedu` agent. Use:
+QiJu intentionally does not create a provider-specific Kiro CLI agent. If you want a
+selectable Kiro agent, create your own `.kiro/agents/qiju.json` after init and point it at
+the installed `.kiro/skills/` entries according to Kiro's agent docs.
 
-```bash
-kiro-cli --agent kedu chat
-```
-
-If you want Kiro CLI to use that agent by default, run this explicitly:
-
-```bash
-kiro-cli agent set-default kedu
-```
-
-Kiro does not use automatic Kedu hooks. Log explicitly before ending work, and write
-temporary entry JSON inside the workspace, such as `.kedu/kedu-entry.json`, not `/tmp`.
+Kiro does not use automatic QiJu hooks. Log explicitly before ending work, and write
+temporary entry JSON inside the workspace, such as `.qiju/qiju-entry.json`, not `/tmp`.
 
 ## Shared Store Rule
 
 All agents share one store:
 
 ```text
-~/.kedu/
+~/.qiju/
 ├── long/
 ├── archive/
 └── redaction_log.jsonl
@@ -123,8 +117,8 @@ There are no per-agent stores. Agent identity is stored per record:
 
 ## Priority Policy
 
-Kedu records are verified session handoff records and project history. Generated host
-instructions should treat Kedu as the source of truth for:
+QiJu records are verified session handoff records and project history. Generated host
+instructions should treat QiJu as the source of truth for:
 
 - previous session progress
 - active implementation decisions
@@ -135,7 +129,7 @@ instructions should treat Kedu as the source of truth for:
 
 Platform memories are weak background unless the user explicitly verifies them.
 
-For Kiro, Specs describe intended requirements. Kedu records describe historical evidence.
+For Kiro, Specs describe intended requirements. QiJu records describe historical evidence.
 If they conflict, inspect both and reconcile before editing.
 
 ## Typical Flow
@@ -150,66 +144,68 @@ Enable a project from inside Codex:
 
 ```bash
 cd /path/to/project
-kedu init --host codex
+qiju init --host codex
 ```
 
 Later, from Kiro in the same project:
 
 ```bash
 cd /path/to/project
-kedu init --host kiro
+qiju init --host kiro
 ```
 
-Both hosts use the same `~/.kedu` store and the same project `.kedu` boot view, while
+Both hosts use the same `~/.qiju` store and the same project `.qiju` boot view, while
 records remain attributable through the `agent` schema field.
 
 ## Uninstall Model
 
-Kedu uninstall removes installation and generated host wiring, not memory records. Preview
+QiJu uninstall removes installation and generated host wiring, not memory records. Preview
 the uninstall first:
 
 ```bash
-kedu uninstall --dry-run
+qiju uninstall --dry-run
 ```
 
 Then run it:
 
 ```bash
-kedu uninstall
+qiju uninstall
 ```
 
-By default, uninstall removes the user-level install, generated Kedu wiring in the current
-project, and generated Kedu wiring in ALL discovered Kedu-enabled projects under common
+By default, uninstall removes the user-level install, generated QiJu wiring in the current
+project, and generated QiJu wiring in ALL discovered QiJu-enabled projects under common
 project roots. Pass `--no-scan-projects` to limit cleanup to the current project, or
 `--user-only` for only the machine-level installation:
 
-- remove the `kedu` CLI shim
-- remove the installed engine copy at `~/.kedu/kedu`
-- remove support templates under `~/.kedu/adapters` and `~/.kedu/agents`
-- remove the runtime lock file `~/.kedu/.kedu.lock`
+- remove the `qiju` CLI shim
+- remove the installed engine copy at `~/.qiju/qiju`
+- remove support templates under `~/.qiju/adapters` and `~/.qiju/agents`
+- remove the runtime lock file `~/.qiju/.qiju.lock`
 - remove generated global host integrations for selected hosts
+- remove legacy Codex skills under `CODEX_HOME/skills/qiju-*` left by older installs that
+  predated Codex's `.agents/skills/<name>/SKILL.md` contract
 
 Use `--project-only` or `--project-root /path/to/project` for project-local wiring:
 
-- remove generated Codex/Claude `kedu-log` and `kedu-search` skills (and any legacy `CLAUDE.md` block or unified `/kedu` skill left by older installs)
-- remove the generated Kiro CLI agent (`.kiro/agents/kedu.json`) and the `kedu-log`/`kedu-search` skills (`.kiro/skills/`); also purge any legacy `.kiro/skills/kedu/`, `.kiro/steering/kedu.md`, and `.kiro/prompts/kedu-agent-prompt.md` left by older installs
-- remove generated Cursor rules
-- preserve only `.kedu/short.jsonl` when local short records exist
-- remove `.kedu/config.json`, temp entry files, and any legacy `.kedu/STATE.md` left by older installs
-- remove `.kedu/` when no local short records exist
+- remove generated Codex/Claude `qiju-log`, `qiju-search`, and `qiju-review` skills (and any legacy `CLAUDE.md` block or unified `/qiju` skill left by older installs)
+- remove generated Kiro `qiju-log`, `qiju-search`, and `qiju-review` skills (`.kiro/skills/`); also purge any legacy `.kiro/agents/qiju.json`, `.kiro/skills/qiju/`, `.kiro/steering/qiju.md`, and `.kiro/prompts/qiju-agent-prompt.md` left by older installs
+- remove generated Cursor `qiju-log`, `qiju-search`, and `qiju-review` skills; also purge the legacy `.cursor/rules/qiju.mdc` rule left by older installs
+- preserve only `.qiju/short.jsonl` when local short records exist
+- remove `.qiju/config.json`, temp entry files, and any legacy `.qiju/STATE.md` left by older installs
+- remove `.qiju/` when no local short records exist
 
-Uninstall does not delete `~/.kedu/long`, `~/.kedu/archive`, redaction logs, or
+Uninstall does not delete `~/.qiju/long`, `~/.qiju/archive`, redaction logs, or
 global long/archive records for any project.
 
 To preview project discovery explicitly:
 
 ```bash
-kedu uninstall --dry-run --scan-root /path/to/projects
+qiju uninstall --dry-run --scan-root /path/to/projects
 ```
 
 ## Open Validation Items
 
-- Test Kiro skill-first behavior (IDE `kedu-log`/`kedu-search` skills and CLI agent registering them via `resources`) when global and local agents both exist.
-- Test Claude/Codex skill discovery after the Kedu rename.
+- Test Kiro skill-first behavior (IDE `qiju-log`/`qiju-search`/`qiju-review` skills and CLI agent registering them via `resources`) when global and local agents both exist.
+- Test Claude/Codex skill discovery after the QiJu rename.
 - Test clean-exit hooks per host.
 - Test install after deleting the original checkout.

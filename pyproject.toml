@@ -1,6 +1,6 @@
 [project]
-name = "kedu"
-version = "0.3.1"
+name = "qiju"
+version = "0.4.0"
 description = "Local-first, lossless session record layer for AI coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-kedu = "scripts.kedu:main"
+qiju = "scripts.qiju:main"
 
 [dependency-groups]
 dev = [

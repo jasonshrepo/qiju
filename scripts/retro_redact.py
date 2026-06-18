@@ -41,20 +41,20 @@ def redact_value_everywhere(
             "'contained' in every string and would inject the placeholder between every "
             "character of every field, corrupting all records"
         )
-    kedu_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
-    paths_mod.ensure_base_dirs(kedu_paths)
+    qiju_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
+    paths_mod.ensure_base_dirs(qiju_paths)
     changes: list[dict[str, Any]] = []
-    with util.exclusive_lock(kedu_paths.lock_file):
-        short_count = _rewrite_jsonl(kedu_paths.short_jsonl, value, placeholder)
+    with util.exclusive_lock(qiju_paths.lock_file):
+        short_count = _rewrite_jsonl(qiju_paths.short_jsonl, value, placeholder)
         if short_count:
-            changes.append({"tier": "short", "path": str(kedu_paths.short_jsonl), "entries": short_count})
+            changes.append({"tier": "short", "path": str(qiju_paths.short_jsonl), "entries": short_count})
 
-        for long_path in paths_mod.all_long_files(kedu_paths.home):
+        for long_path in paths_mod.all_long_files(qiju_paths.home):
             count = _rewrite_jsonl(long_path, value, placeholder)
             if count:
                 changes.append({"tier": "long", "path": str(long_path), "entries": count})
 
-        for project_dir in sorted(kedu_paths.archive_dir.glob("project=*")) if kedu_paths.archive_dir.exists() else []:
+        for project_dir in sorted(qiju_paths.archive_dir.glob("project=*")) if qiju_paths.archive_dir.exists() else []:
             for parquet_path in sorted(project_dir.glob("month=*/entries.parquet")):
                 entries = archive.read_parquet(parquet_path)
                 changed_entries = []
@@ -76,6 +76,6 @@ def redact_value_everywhere(
             "changes": changes,
         }
         redacted_event, _ = redact.redact_value(event, "redaction_log")
-        util.append_jsonl(kedu_paths.redaction_log, redacted_event)
+        util.append_jsonl(qiju_paths.redaction_log, redacted_event)
     return event
 

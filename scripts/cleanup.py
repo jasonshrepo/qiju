@@ -12,8 +12,8 @@ try:
     from .block_format import (
         CLAUDE_BLOCK_START,
         CLAUDE_BLOCK_STOP_PREFIX,
-        KEDU_BLOCK_END,
-        KEDU_BLOCK_START,
+        QIJU_BLOCK_END,
+        QIJU_BLOCK_START,
         find_line_marked_block,
     )
     from . import paths as paths_mod, util
@@ -21,8 +21,8 @@ except ImportError:  # pragma: no cover
     from block_format import (  # type: ignore
         CLAUDE_BLOCK_START,
         CLAUDE_BLOCK_STOP_PREFIX,
-        KEDU_BLOCK_END,
-        KEDU_BLOCK_START,
+        QIJU_BLOCK_END,
+        QIJU_BLOCK_START,
         find_line_marked_block,
     )
     import paths as paths_mod  # type: ignore
@@ -35,7 +35,7 @@ SCAN_SKIP_DIRS = {
     ".cache",
     ".git",
     ".hg",
-    ".kedu",
+    ".qiju",
     ".memory",
     ".mypy_cache",
     ".pytest_cache",
@@ -111,12 +111,12 @@ def _remove_file_if_contains(path: Path, needle: str, result: CleanupResult, rea
         result.warnings.append(f"skip non-text file: {path}")
         return
     if needle not in content:
-        result.preserved.append({"path": str(path), "reason": "file does not look Kedu-owned"})
+        result.preserved.append({"path": str(path), "reason": "file does not look Qiju-owned"})
         return
     _remove_file(path, result, reason, dry_run=dry_run)
 
 
-def _remove_kedu_block(path: Path, result: CleanupResult, *, dry_run: bool) -> None:
+def _remove_qiju_block(path: Path, result: CleanupResult, *, dry_run: bool) -> None:
     if not path.exists() or not path.is_file():
         return
     content = path.read_text(encoding="utf-8")
@@ -124,17 +124,17 @@ def _remove_kedu_block(path: Path, result: CleanupResult, *, dry_run: bool) -> N
     if line_marked:
         start, end = line_marked
     else:
-        start = content.find(KEDU_BLOCK_START)
-        end = content.find(KEDU_BLOCK_END)
+        start = content.find(QIJU_BLOCK_START)
+        end = content.find(QIJU_BLOCK_END)
         if start != -1 and end != -1 and end >= start:
-            end += len(KEDU_BLOCK_END)
+            end += len(QIJU_BLOCK_END)
         else:
             start = end = -1
     if start == -1 or end == -1 or end < start:
-        result.preserved.append({"path": str(path), "reason": "no Kedu block found"})
+        result.preserved.append({"path": str(path), "reason": "no Qiju block found"})
         return
     updated = (content[:start].rstrip() + "\n\n" + content[end:].lstrip()).strip() + "\n"
-    _add_action(result, "remove_kedu_block", path, "remove generated Kedu instruction block", dry_run=dry_run)
+    _add_action(result, "remove_qiju_block", path, "remove generated Qiju instruction block", dry_run=dry_run)
     if not dry_run:
         if updated.strip():
             path.write_text(updated, encoding="utf-8")
@@ -162,7 +162,7 @@ def _entry_count(path: Path) -> int:
 def _project_slug_from_config(project_root: Path, project: str | None) -> str | None:
     if project:
         return project
-    config_path = project_root / ".kedu" / "config.json"
+    config_path = project_root / ".qiju" / "config.json"
     if not config_path.exists():
         return None
     try:
@@ -174,44 +174,44 @@ def _project_slug_from_config(project_root: Path, project: str | None) -> str | 
     return None
 
 
-def _prune_project_kedu_to_short(kedu_paths: paths_mod.KeduPaths, result: CleanupResult, *, dry_run: bool) -> None:
-    if not kedu_paths.project_kedu_dir.exists():
-        result.preserved.append({"path": str(kedu_paths.project_kedu_dir), "reason": "project .kedu directory does not exist"})
+def _prune_project_qiju_to_short(qiju_paths: paths_mod.QijuPaths, result: CleanupResult, *, dry_run: bool) -> None:
+    if not qiju_paths.project_qiju_dir.exists():
+        result.preserved.append({"path": str(qiju_paths.project_qiju_dir), "reason": "project .qiju directory does not exist"})
         return
 
-    # SAFETY GUARD: if the project's .kedu directory resolves to — or is an ancestor of —
-    # the global Kedu store, refuse to touch it. Otherwise (e.g. running uninstall from
-    # $HOME, where project_root/.kedu == ~/.kedu) we would rm -rf the global long/archive
+    # SAFETY GUARD: if the project's .qiju directory resolves to — or is an ancestor of —
+    # the global Qiju store, refuse to touch it. Otherwise (e.g. running uninstall from
+    # $HOME, where project_root/.qiju == ~/.qiju) we would rm -rf the global long/archive
     # records. Memory is NEVER removed by uninstall.
-    home_store = paths_mod.kedu_home()
-    if _contains_path(kedu_paths.project_kedu_dir, home_store):
+    home_store = paths_mod.qiju_home()
+    if _contains_path(qiju_paths.project_qiju_dir, home_store):
         result.preserved.append({
-            "path": str(kedu_paths.project_kedu_dir),
-            "reason": "project .kedu resolves to the global Kedu store; refusing to remove memory (long/archive)",
+            "path": str(qiju_paths.project_qiju_dir),
+            "reason": "project .qiju resolves to the global Qiju store; refusing to remove memory (long/archive)",
         })
         return
 
-    short_count = _entry_count(kedu_paths.short_jsonl)
-    long_count = _entry_count(kedu_paths.long_jsonl)
+    short_count = _entry_count(qiju_paths.short_jsonl)
+    long_count = _entry_count(qiju_paths.long_jsonl)
     if long_count:
-        result.preserved.append({"path": str(kedu_paths.long_jsonl), "reason": f"global long records are never removed by uninstall: long={long_count}"})
+        result.preserved.append({"path": str(qiju_paths.long_jsonl), "reason": f"global long records are never removed by uninstall: long={long_count}"})
 
     if short_count:
-        for child in kedu_paths.project_kedu_dir.iterdir():
+        for child in qiju_paths.project_qiju_dir.iterdir():
             if child.name == "short.jsonl":
                 continue
-            reason = "remove generated project .kedu metadata; preserve short records"
+            reason = "remove generated project .qiju metadata; preserve short records"
             if child.is_dir():
                 _remove_dir(child, result, reason, dry_run=dry_run)
             else:
                 _remove_file(child, result, reason, dry_run=dry_run)
-        result.preserved.append({"path": str(kedu_paths.short_jsonl), "reason": f"preserve project short records: short={short_count}"})
+        result.preserved.append({"path": str(qiju_paths.short_jsonl), "reason": f"preserve project short records: short={short_count}"})
         return
 
     _remove_dir(
-        kedu_paths.project_kedu_dir,
+        qiju_paths.project_qiju_dir,
         result,
-        "remove project .kedu metadata; no local short records (global long/archive preserved)",
+        "remove project .qiju metadata; no local short records (global long/archive preserved)",
         dry_run=dry_run,
     )
 
@@ -221,77 +221,87 @@ def cleanup_user_install(
     *,
     bin_dir: Path,
     install_root: Path,
-    kedu_home: Path,
+    qiju_home: Path,
     hosts: tuple[str, ...],
     dry_run: bool,
 ) -> None:
-    shim = bin_dir / "kedu"
+    shim = bin_dir / "qiju"
     if shim.exists():
         try:
             content = shim.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             content = ""
-        if str(install_root) in content or ".venv/bin/kedu" in content:
-            _remove_file(shim, result, "remove Kedu CLI shim", dry_run=dry_run)
+        if str(install_root) in content or ".venv/bin/qiju" in content:
+            _remove_file(shim, result, "remove Qiju CLI shim", dry_run=dry_run)
         else:
-            result.preserved.append({"path": str(shim), "reason": "kedu shim does not look owned by this install"})
+            result.preserved.append({"path": str(shim), "reason": "qiju shim does not look owned by this install"})
 
-    if install_root.resolve() == kedu_home.resolve() or _contains_path(install_root, kedu_home):
+    if install_root.resolve() == qiju_home.resolve() or _contains_path(install_root, qiju_home):
         result.preserved.append(
             {
                 "path": str(install_root),
-                "reason": "install root overlaps Kedu home; refusing to remove possible records",
+                "reason": "install root overlaps Qiju home; refusing to remove possible records",
             }
         )
     else:
-        _remove_dir(install_root, result, "remove installed Kedu engine", dry_run=dry_run)
+        _remove_dir(install_root, result, "remove installed Qiju engine", dry_run=dry_run)
     for child in ("adapters", "agents", "logs"):
-        _remove_dir(kedu_home / child, result, "remove installed Kedu support templates", dry_run=dry_run)
+        _remove_dir(qiju_home / child, result, "remove installed Qiju support templates", dry_run=dry_run)
 
     # The query_log feature was removed; a query_log.jsonl left by a prior install is now
     # orphaned non-memory data. Remove it (redaction_log.jsonl is audit data — preserved).
-    _remove_file(kedu_home / "query_log.jsonl", result, "remove legacy Kedu query log", dry_run=dry_run)
+    _remove_file(qiju_home / "query_log.jsonl", result, "remove legacy Qiju query log", dry_run=dry_run)
 
     # The lock file is an empty fcntl lock created at runtime by writes — operational, not memory.
-    _remove_file(kedu_home / ".kedu.lock", result, "remove Kedu runtime lock", dry_run=dry_run)
+    _remove_file(qiju_home / ".qiju.lock", result, "remove Qiju runtime lock", dry_run=dry_run)
 
     launch_agents = Path.home() / "Library" / "LaunchAgents"
     if launch_agents.exists():
-        for plist in launch_agents.glob("*.kedu*.plist"):
-            _remove_file_if_contains(plist, "kedu", result, "remove Kedu launchd maintenance job", dry_run=dry_run)
+        for plist in launch_agents.glob("*.qiju*.plist"):
+            _remove_file_if_contains(plist, "qiju", result, "remove Qiju launchd maintenance job", dry_run=dry_run)
 
     if "codex" in hosts:
         codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
         agent_home = Path(os.environ.get("AGENT_HOME", "~")).expanduser()
-        _remove_kedu_block(codex_home / "AGENTS.md", result, dry_run=dry_run)
-        _remove_dir(codex_home / "skills" / "kedu", result, "remove legacy global Codex Kedu skill", dry_run=dry_run)
-        _remove_dir(agent_home / ".agents" / "skills" / "kedu", result, "remove legacy global Codex Kedu skill", dry_run=dry_run)
-        _remove_dir(agent_home / ".agents" / "skills" / "kedu-log", result, "remove global Codex Kedu log skill", dry_run=dry_run)
-        _remove_dir(agent_home / ".agents" / "skills" / "kedu-search", result, "remove global Codex Kedu search skill", dry_run=dry_run)
+        _remove_qiju_block(codex_home / "AGENTS.md", result, dry_run=dry_run)
+        _remove_dir(codex_home / "skills" / "qiju", result, "remove legacy global Codex Qiju skill", dry_run=dry_run)
+        _remove_dir(codex_home / "skills" / "qiju-log", result, "remove legacy global Codex Qiju log skill", dry_run=dry_run)
+        _remove_dir(codex_home / "skills" / "qiju-search", result, "remove legacy global Codex Qiju search skill", dry_run=dry_run)
+        _remove_dir(codex_home / "skills" / "qiju-review", result, "remove legacy global Codex Qiju review skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "qiju", result, "remove legacy global Codex Qiju skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "qiju-log", result, "remove global Codex Qiju log skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "qiju-search", result, "remove global Codex Qiju search skill", dry_run=dry_run)
+        _remove_dir(agent_home / ".agents" / "skills" / "qiju-review", result, "remove global Codex Qiju review skill", dry_run=dry_run)
     if "claude" in hosts:
         claude_home = Path(os.environ.get("CLAUDE_HOME", "~/.claude")).expanduser()
-        _remove_kedu_block(claude_home / "CLAUDE.md", result, dry_run=dry_run)
-        _remove_dir(claude_home / "skills" / "kedu", result, "remove Claude Kedu skill", dry_run=dry_run)
-        _remove_dir(claude_home / "skills" / "kedu-log", result, "remove Claude Kedu log skill", dry_run=dry_run)
-        _remove_dir(claude_home / "skills" / "kedu-search", result, "remove Claude Kedu search skill", dry_run=dry_run)
+        _remove_qiju_block(claude_home / "CLAUDE.md", result, dry_run=dry_run)
+        _remove_dir(claude_home / "skills" / "qiju", result, "remove Claude Qiju skill", dry_run=dry_run)
+        _remove_dir(claude_home / "skills" / "qiju-log", result, "remove Claude Qiju log skill", dry_run=dry_run)
+        _remove_dir(claude_home / "skills" / "qiju-search", result, "remove Claude Qiju search skill", dry_run=dry_run)
+        _remove_dir(claude_home / "skills" / "qiju-review", result, "remove Claude Qiju review skill", dry_run=dry_run)
     if "kiro" in hosts:
         kiro_home = Path(os.environ.get("KIRO_HOME", "~/.kiro")).expanduser()
         # Init is skill-first and no longer writes Kiro steering or a saved prompt, but
         # legacy installs may still have them — purge them as the cleanup safety net.
-        _remove_file_if_contains(kiro_home / "steering" / "kedu.md", "Kedu", result, "remove global Kiro Kedu steering", dry_run=dry_run)
-        _remove_file_if_contains(kiro_home / "agents" / "kedu.json", "Kedu", result, "remove global Kiro Kedu CLI agent", dry_run=dry_run)
-        _remove_file_if_contains(kiro_home / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove global Kiro Kedu prompt", dry_run=dry_run)
-        _remove_dir(kiro_home / "skills" / "kedu", result, "remove legacy global Kiro Kedu skill", dry_run=dry_run)
-        _remove_dir(kiro_home / "skills" / "kedu-log", result, "remove global Kiro Kedu log skill", dry_run=dry_run)
-        _remove_dir(kiro_home / "skills" / "kedu-search", result, "remove global Kiro Kedu search skill", dry_run=dry_run)
+        _remove_file_if_contains(kiro_home / "steering" / "qiju.md", "Qiju", result, "remove global Kiro Qiju steering", dry_run=dry_run)
+        _remove_file_if_contains(kiro_home / "agents" / "qiju.json", "Qiju", result, "remove global Kiro Qiju CLI agent", dry_run=dry_run)
+        _remove_file_if_contains(kiro_home / "prompts" / "qiju-agent-prompt.md", "Qiju", result, "remove global Kiro Qiju prompt", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "qiju", result, "remove legacy global Kiro Qiju skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "qiju-log", result, "remove global Kiro Qiju log skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "qiju-search", result, "remove global Kiro Qiju search skill", dry_run=dry_run)
+        _remove_dir(kiro_home / "skills" / "qiju-review", result, "remove global Kiro Qiju review skill", dry_run=dry_run)
     if "cursor" in hosts:
         cursor_home = Path(os.environ.get("CURSOR_HOME", "~/.cursor")).expanduser()
-        _remove_file_if_contains(cursor_home / "rules" / "kedu.mdc", "Kedu", result, "remove global Cursor Kedu rule", dry_run=dry_run)
+        _remove_file_if_contains(cursor_home / "rules" / "qiju.mdc", "Qiju", result, "remove global Cursor Qiju rule", dry_run=dry_run)
+        _remove_dir(cursor_home / "skills" / "qiju", result, "remove legacy global Cursor Qiju skill", dry_run=dry_run)
+        _remove_dir(cursor_home / "skills" / "qiju-log", result, "remove global Cursor Qiju log skill", dry_run=dry_run)
+        _remove_dir(cursor_home / "skills" / "qiju-search", result, "remove global Cursor Qiju search skill", dry_run=dry_run)
+        _remove_dir(cursor_home / "skills" / "qiju-review", result, "remove global Cursor Qiju review skill", dry_run=dry_run)
 
     for preserved_name in ("long", "archive", "redaction_log.jsonl"):
-        path = kedu_home / preserved_name
+        path = qiju_home / preserved_name
         if path.exists():
-            result.preserved.append({"path": str(path), "reason": "Kedu records/audit data are never removed by uninstall"})
+            result.preserved.append({"path": str(path), "reason": "Qiju records/audit data are never removed by uninstall"})
 
 
 def cleanup_project_install(
@@ -303,31 +313,38 @@ def cleanup_project_install(
     dry_run: bool,
 ) -> None:
     resolved_project = _project_slug_from_config(project_root, project)
-    kedu_paths = paths_mod.resolve_paths(project=resolved_project, cwd=project_root)
+    qiju_paths = paths_mod.resolve_paths(project=resolved_project, cwd=project_root)
 
     if "codex" in hosts:
-        _remove_kedu_block(project_root / "AGENTS.md", result, dry_run=dry_run)
-        _remove_dir(project_root / ".agents" / "skills" / "kedu", result, "remove legacy project Codex Kedu skill", dry_run=dry_run)
-        _remove_dir(project_root / ".agents" / "skills" / "kedu-log", result, "remove project Codex Kedu log skill", dry_run=dry_run)
-        _remove_dir(project_root / ".agents" / "skills" / "kedu-search", result, "remove project Codex Kedu search skill", dry_run=dry_run)
+        _remove_qiju_block(project_root / "AGENTS.md", result, dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "qiju", result, "remove legacy project Codex Qiju skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "qiju-log", result, "remove project Codex Qiju log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "qiju-search", result, "remove project Codex Qiju search skill", dry_run=dry_run)
+        _remove_dir(project_root / ".agents" / "skills" / "qiju-review", result, "remove project Codex Qiju review skill", dry_run=dry_run)
     if "claude" in hosts:
-        _remove_kedu_block(project_root / "CLAUDE.md", result, dry_run=dry_run)
-        _remove_dir(project_root / ".claude" / "skills" / "kedu", result, "remove project Claude Kedu skill", dry_run=dry_run)
-        _remove_dir(project_root / ".claude" / "skills" / "kedu-log", result, "remove project Claude Kedu log skill", dry_run=dry_run)
-        _remove_dir(project_root / ".claude" / "skills" / "kedu-search", result, "remove project Claude Kedu search skill", dry_run=dry_run)
+        _remove_qiju_block(project_root / "CLAUDE.md", result, dry_run=dry_run)
+        _remove_dir(project_root / ".claude" / "skills" / "qiju", result, "remove project Claude Qiju skill", dry_run=dry_run)
+        _remove_dir(project_root / ".claude" / "skills" / "qiju-log", result, "remove project Claude Qiju log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".claude" / "skills" / "qiju-search", result, "remove project Claude Qiju search skill", dry_run=dry_run)
+        _remove_dir(project_root / ".claude" / "skills" / "qiju-review", result, "remove project Claude Qiju review skill", dry_run=dry_run)
     if "kiro" in hosts:
         # Init is skill-first and no longer writes Kiro steering or a saved prompt, but
         # legacy installs may still have them — purge them as the cleanup safety net.
-        _remove_file_if_contains(project_root / ".kiro" / "steering" / "kedu.md", "Kedu", result, "remove project Kiro Kedu steering", dry_run=dry_run)
-        _remove_file_if_contains(project_root / ".kiro" / "agents" / "kedu.json", "Kedu", result, "remove project Kiro Kedu CLI agent", dry_run=dry_run)
-        _remove_file_if_contains(project_root / ".kiro" / "prompts" / "kedu-agent-prompt.md", "Kedu", result, "remove project Kiro Kedu prompt", dry_run=dry_run)
-        _remove_dir(project_root / ".kiro" / "skills" / "kedu", result, "remove legacy project Kiro Kedu skill", dry_run=dry_run)
-        _remove_dir(project_root / ".kiro" / "skills" / "kedu-log", result, "remove project Kiro Kedu log skill", dry_run=dry_run)
-        _remove_dir(project_root / ".kiro" / "skills" / "kedu-search", result, "remove project Kiro Kedu search skill", dry_run=dry_run)
+        _remove_file_if_contains(project_root / ".kiro" / "steering" / "qiju.md", "Qiju", result, "remove project Kiro Qiju steering", dry_run=dry_run)
+        _remove_file_if_contains(project_root / ".kiro" / "agents" / "qiju.json", "Qiju", result, "remove project Kiro Qiju CLI agent", dry_run=dry_run)
+        _remove_file_if_contains(project_root / ".kiro" / "prompts" / "qiju-agent-prompt.md", "Qiju", result, "remove project Kiro Qiju prompt", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "qiju", result, "remove legacy project Kiro Qiju skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "qiju-log", result, "remove project Kiro Qiju log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "qiju-search", result, "remove project Kiro Qiju search skill", dry_run=dry_run)
+        _remove_dir(project_root / ".kiro" / "skills" / "qiju-review", result, "remove project Kiro Qiju review skill", dry_run=dry_run)
     if "cursor" in hosts:
-        _remove_file_if_contains(project_root / ".cursor" / "rules" / "kedu.mdc", "Kedu", result, "remove project Cursor Kedu rule", dry_run=dry_run)
+        _remove_file_if_contains(project_root / ".cursor" / "rules" / "qiju.mdc", "Qiju", result, "remove project Cursor Qiju rule", dry_run=dry_run)
+        _remove_dir(project_root / ".cursor" / "skills" / "qiju", result, "remove legacy project Cursor Qiju skill", dry_run=dry_run)
+        _remove_dir(project_root / ".cursor" / "skills" / "qiju-log", result, "remove project Cursor Qiju log skill", dry_run=dry_run)
+        _remove_dir(project_root / ".cursor" / "skills" / "qiju-search", result, "remove project Cursor Qiju search skill", dry_run=dry_run)
+        _remove_dir(project_root / ".cursor" / "skills" / "qiju-review", result, "remove project Cursor Qiju review skill", dry_run=dry_run)
 
-    _prune_project_kedu_to_short(kedu_paths, result, dry_run=dry_run)
+    _prune_project_qiju_to_short(qiju_paths, result, dry_run=dry_run)
 
 
 def parse_hosts(value: str) -> tuple[str, ...]:
@@ -341,7 +358,7 @@ def parse_hosts(value: str) -> tuple[str, ...]:
 
 
 def _default_scan_roots() -> list[Path]:
-    env_roots = os.environ.get("KEDU_PROJECT_SCAN_ROOTS")
+    env_roots = os.environ.get("QIJU_PROJECT_SCAN_ROOTS")
     roots: list[Path] = []
     if env_roots:
         roots.extend(Path(part).expanduser() for part in env_roots.split(os.pathsep) if part)
@@ -380,24 +397,31 @@ def _default_scan_roots() -> list[Path]:
     return deduped
 
 
-def _looks_like_kedu_project(path: Path) -> bool:
+def _looks_like_qiju_project(path: Path) -> bool:
     return any(
         candidate.exists()
         for candidate in (
-            path / ".kedu" / "config.json",
-            path / ".kedu" / "short.jsonl",
-            path / ".kiro" / "agents" / "kedu.json",
-            path / ".kiro" / "steering" / "kedu.md",
-            path / ".kiro" / "skills" / "kedu" / "SKILL.md",
-            path / ".kiro" / "skills" / "kedu-log" / "SKILL.md",
-            path / ".kiro" / "skills" / "kedu-search" / "SKILL.md",
-            path / ".claude" / "skills" / "kedu" / "SKILL.md",
-            path / ".claude" / "skills" / "kedu-log" / "SKILL.md",
-            path / ".claude" / "skills" / "kedu-search" / "SKILL.md",
-            path / ".agents" / "skills" / "kedu" / "SKILL.md",
-            path / ".agents" / "skills" / "kedu-log" / "SKILL.md",
-            path / ".agents" / "skills" / "kedu-search" / "SKILL.md",
-            path / ".cursor" / "rules" / "kedu.mdc",
+            path / ".qiju" / "config.json",
+            path / ".qiju" / "short.jsonl",
+            path / ".kiro" / "agents" / "qiju.json",
+            path / ".kiro" / "steering" / "qiju.md",
+            path / ".kiro" / "skills" / "qiju" / "SKILL.md",
+            path / ".kiro" / "skills" / "qiju-log" / "SKILL.md",
+            path / ".kiro" / "skills" / "qiju-search" / "SKILL.md",
+            path / ".kiro" / "skills" / "qiju-review" / "SKILL.md",
+            path / ".claude" / "skills" / "qiju" / "SKILL.md",
+            path / ".claude" / "skills" / "qiju-log" / "SKILL.md",
+            path / ".claude" / "skills" / "qiju-search" / "SKILL.md",
+            path / ".claude" / "skills" / "qiju-review" / "SKILL.md",
+            path / ".agents" / "skills" / "qiju" / "SKILL.md",
+            path / ".agents" / "skills" / "qiju-log" / "SKILL.md",
+            path / ".agents" / "skills" / "qiju-search" / "SKILL.md",
+            path / ".agents" / "skills" / "qiju-review" / "SKILL.md",
+            path / ".cursor" / "skills" / "qiju" / "SKILL.md",
+            path / ".cursor" / "skills" / "qiju-log" / "SKILL.md",
+            path / ".cursor" / "skills" / "qiju-search" / "SKILL.md",
+            path / ".cursor" / "skills" / "qiju-review" / "SKILL.md",
+            path / ".cursor" / "rules" / "qiju.mdc",
         )
     )
 
@@ -419,12 +443,12 @@ def discover_project_roots(scan_roots: list[str | Path] | None = None, *, max_de
             current_path = Path(current)
             depth = len(current_path.parts) - root_depth
             dirnames[:] = [name for name in dirnames if name not in SCAN_SKIP_DIRS]
-            if _looks_like_kedu_project(current_path):
+            if _looks_like_qiju_project(current_path):
                 key = str(current_path.resolve())
                 if key not in seen:
                     seen.add(key)
                     discovered.append(current_path.resolve())
-                dirnames[:] = [name for name in dirnames if name not in {".kedu", ".claude", ".kiro", ".cursor"}]
+                dirnames[:] = [name for name in dirnames if name not in {".qiju", ".claude", ".kiro", ".cursor"}]
             if depth >= max_depth:
                 dirnames[:] = []
     return discovered
@@ -444,16 +468,16 @@ def cleanup(
     dry_run: bool = True,
 ) -> CleanupResult:
     result = CleanupResult(dry_run=dry_run)
-    kedu_home = paths_mod.kedu_home()
-    resolved_bin_dir = Path(bin_dir or os.environ.get("KEDU_BIN_DIR", "~/.local/bin")).expanduser()
-    resolved_install_root = Path(install_root or os.environ.get("KEDU_INSTALL_ROOT", kedu_home / "kedu")).expanduser()
+    qiju_home = paths_mod.qiju_home()
+    resolved_bin_dir = Path(bin_dir or os.environ.get("QIJU_BIN_DIR", "~/.local/bin")).expanduser()
+    resolved_install_root = Path(install_root or os.environ.get("QIJU_INSTALL_ROOT", qiju_home / "qiju")).expanduser()
 
     if user:
         cleanup_user_install(
             result,
             bin_dir=resolved_bin_dir,
             install_root=resolved_install_root,
-            kedu_home=kedu_home,
+            qiju_home=qiju_home,
             hosts=hosts,
             dry_run=dry_run,
         )

@@ -23,13 +23,13 @@ if [ "${{1:-}}" != "sync" ]; then
 fi
 root="$(pwd)"
 mkdir -p "$root/.venv/bin"
-cat > "$root/.venv/bin/kedu" <<'SH'
+cat > "$root/.venv/bin/qiju" <<'SH'
 #!/usr/bin/env bash
-exec "{sys.executable}" "__KEDU_ROOT__/scripts/kedu.py" "$@"
+exec "{sys.executable}" "__QIJU_ROOT__/scripts/qiju.py" "$@"
 SH
-sed -i.bak "s#__KEDU_ROOT__#$root#g" "$root/.venv/bin/kedu"
-rm -f "$root/.venv/bin/kedu.bak"
-chmod 0755 "$root/.venv/bin/kedu"
+sed -i.bak "s#__QIJU_ROOT__#$root#g" "$root/.venv/bin/qiju"
+rm -f "$root/.venv/bin/qiju.bak"
+chmod 0755 "$root/.venv/bin/qiju"
 """,
         encoding="utf-8",
     )
@@ -49,15 +49,15 @@ def test_batch_install_codex_and_cursor_route_through_init(tmp_path):
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
 
-    kedu_home = tmp_path / "home" / ".kedu"
+    qiju_home = tmp_path / "home" / ".qiju"
     bin_dir = tmp_path / "bin"
-    install_root = tmp_path / "install-root" / "kedu"
+    install_root = tmp_path / "install-root" / "qiju"
     result = subprocess.run(
         [
             "bash",
             str(INSTALL_SH),
-            "--kedu-home",
-            str(kedu_home),
+            "--qiju-home",
+            str(qiju_home),
             "--bin-dir",
             str(bin_dir),
             "--prefix",
@@ -75,14 +75,18 @@ def test_batch_install_codex_and_cursor_route_through_init(tmp_path):
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    config = json.loads((project / ".kedu" / "config.json").read_text(encoding="utf-8"))
+    config = json.loads((project / ".qiju" / "config.json").read_text(encoding="utf-8"))
     assert config["enabled_agents"] == ["codex", "cursor"]
-    assert (project / ".kedu" / "short.jsonl").exists()
+    assert (project / ".qiju" / "short.jsonl").exists()
     assert not (project / "AGENTS.md").exists()
-    assert (project / ".agents" / "skills" / "kedu-log" / "SKILL.md").exists()
-    assert (project / ".agents" / "skills" / "kedu-search" / "SKILL.md").exists()
-    assert (project / ".cursor" / "rules" / "kedu.mdc").exists()
-    assert ".kedu/" in (git_info / "exclude").read_text(encoding="utf-8")
+    assert (project / ".agents" / "skills" / "qiju-log" / "SKILL.md").exists()
+    assert (project / ".agents" / "skills" / "qiju-search" / "SKILL.md").exists()
+    assert (project / ".agents" / "skills" / "qiju-review" / "SKILL.md").exists()
+    assert (project / ".cursor" / "skills" / "qiju-log" / "SKILL.md").exists()
+    assert (project / ".cursor" / "skills" / "qiju-search" / "SKILL.md").exists()
+    assert (project / ".cursor" / "skills" / "qiju-review" / "SKILL.md").exists()
+    assert not (project / ".cursor" / "rules" / "qiju.mdc").exists()
+    assert ".qiju/" in (git_info / "exclude").read_text(encoding="utf-8")
 
 
 def test_reinstall_prunes_stale_engine_files_but_preserves_records_and_venv(tmp_path):
@@ -92,17 +96,17 @@ def test_reinstall_prunes_stale_engine_files_but_preserves_records_and_venv(tmp_
     env = os.environ.copy()
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
 
-    kedu_home = tmp_path / "home" / ".kedu"
+    qiju_home = tmp_path / "home" / ".qiju"
     bin_dir = tmp_path / "bin"
-    install_root = tmp_path / "install-root" / "kedu"
+    install_root = tmp_path / "install-root" / "qiju"
 
     def run_install():
         return subprocess.run(
             [
                 "bash",
                 str(INSTALL_SH),
-                "--kedu-home",
-                str(kedu_home),
+                "--qiju-home",
+                str(qiju_home),
                 "--bin-dir",
                 str(bin_dir),
                 "--prefix",
@@ -122,10 +126,10 @@ def test_reinstall_prunes_stale_engine_files_but_preserves_records_and_venv(tmp_
     stale = install_root / "scripts" / "_stale_module.py"
     stale.parent.mkdir(parents=True, exist_ok=True)
     stale.write_text("# stale\n", encoding="utf-8")
-    record = kedu_home / "long" / "old.jsonl"
+    record = qiju_home / "long" / "old.jsonl"
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text('{"id": "old"}\n', encoding="utf-8")
-    venv_marker = install_root / ".venv" / "bin" / "kedu"
+    venv_marker = install_root / ".venv" / "bin" / "qiju"
     assert venv_marker.exists()
 
     second = run_install()

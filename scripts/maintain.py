@@ -44,23 +44,23 @@ def _older_than(entry: dict[str, Any], now: datetime, days: int) -> bool:
     return parsed < now - timedelta(days=days)
 
 
-def rotate_short(kedu_paths: paths_mod.KeduPaths, *, now: datetime, dry_run: bool) -> dict[str, Any]:
-    entries = util.read_jsonl(kedu_paths.short_jsonl)
+def rotate_short(qiju_paths: paths_mod.QijuPaths, *, now: datetime, dry_run: bool) -> dict[str, Any]:
+    entries = util.read_jsonl(qiju_paths.short_jsonl)
     keep = [entry for entry in entries if not _older_than(entry, now, SHORT_WINDOW_DAYS)]
     removed = len(entries) - len(keep)
     if removed and not dry_run:
-        util.write_jsonl_atomic(kedu_paths.short_jsonl, keep)
-    return {"path": str(kedu_paths.short_jsonl), "removed": removed, "kept": len(keep)}
+        util.write_jsonl_atomic(qiju_paths.short_jsonl, keep)
+    return {"path": str(qiju_paths.short_jsonl), "removed": removed, "kept": len(keep)}
 
 
 def _write_archive_partition(
-    kedu_paths: paths_mod.KeduPaths,
+    qiju_paths: paths_mod.QijuPaths,
     month: str,
     entries: list[dict[str, Any]],
     *,
     dry_run: bool,
 ) -> dict[str, Any]:
-    output_path = kedu_paths.archive_partition(month)
+    output_path = qiju_paths.archive_partition(month)
     existing = archive.read_parquet(output_path) if output_path.exists() else []
     merged = util.stable_unique(existing + entries)
     if not dry_run:
@@ -69,19 +69,19 @@ def _write_archive_partition(
 
 
 def archive_long_project(
-    kedu_paths: paths_mod.KeduPaths,
+    qiju_paths: paths_mod.QijuPaths,
     *,
     now: datetime,
     dry_run: bool,
 ) -> dict[str, Any]:
-    long_entries = util.read_jsonl(kedu_paths.long_jsonl)
+    long_entries = util.read_jsonl(qiju_paths.long_jsonl)
     if not long_entries:
-        return {"project": kedu_paths.project, "archived": [], "remaining": 0, "warnings": []}
+        return {"project": qiju_paths.project, "archived": [], "remaining": 0, "warnings": []}
 
     warnings: list[str] = []
-    force = kedu_paths.long_jsonl.exists() and kedu_paths.long_jsonl.stat().st_size > FORCE_LONG_FILE_BYTES
+    force = qiju_paths.long_jsonl.exists() and qiju_paths.long_jsonl.stat().st_size > FORCE_LONG_FILE_BYTES
     if force:
-        warnings.append(f"{kedu_paths.long_jsonl} exceeds {FORCE_LONG_FILE_BYTES} bytes; force-archiving old entries")
+        warnings.append(f"{qiju_paths.long_jsonl} exceeds {FORCE_LONG_FILE_BYTES} bytes; force-archiving old entries")
 
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for entry in long_entries:
@@ -105,17 +105,17 @@ def archive_long_project(
         )
         if not should_archive:
             continue
-        archived.append(_write_archive_partition(kedu_paths, month, entries, dry_run=dry_run) | {"size": size})
+        archived.append(_write_archive_partition(qiju_paths, month, entries, dry_run=dry_run) | {"size": size})
         archived_ids.update(str(entry["id"]) for entry in entries)
 
     if archived_ids and not dry_run:
         remaining = [entry for entry in long_entries if str(entry.get("id")) not in archived_ids]
-        util.write_jsonl_atomic(kedu_paths.long_jsonl, remaining)
+        util.write_jsonl_atomic(qiju_paths.long_jsonl, remaining)
     else:
         remaining = long_entries
 
     return {
-        "project": kedu_paths.project,
+        "project": qiju_paths.project,
         "archived": archived,
         "remaining": len(remaining),
         "warnings": warnings,

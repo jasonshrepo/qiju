@@ -53,8 +53,8 @@ def prepare_entry(
     entry["schema_version"] = schema.SCHEMA_VERSION
     entry["source"] = source
     entry["project"] = project
-    entry["agent"] = agent or os.environ.get("KEDU_AGENT") or entry.get("agent") or "unknown"
-    # Kedu is lossless: a missing OR malformed ts must not fail or drop the log.
+    entry["agent"] = agent or os.environ.get("QIJU_AGENT") or entry.get("agent") or "unknown"
+    # Qiju is lossless: a missing OR malformed ts must not fail or drop the log.
     # Coerce anything unparseable to "now" so the persisted entry always has a valid ts.
     if util.try_parse_iso(entry.get("ts")) is None:
         entry["ts"] = util.utcish_now_iso()
@@ -79,43 +79,43 @@ def log_entry(
     cwd: str | Path | None = None,
     session_id: str | None = None,
 ) -> str:
-    kedu_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
+    qiju_paths = paths_mod.resolve_paths(project=project, cwd=cwd)
     # Refuse to mint a new project identity from a wandered cwd. This fires only when the
-    # root fell through to the cwd fallback (no KEDU_PROJECT_ROOT, no init marker found by
+    # root fell through to the cwd fallback (no QIJU_PROJECT_ROOT, no init marker found by
     # walking up, no git toplevel) and the caller did not name a project explicitly.
     if (
-        kedu_paths.root_origin == "cwd"
+        qiju_paths.root_origin == "cwd"
         and not project
-        and not (kedu_paths.project_kedu_dir / "config.json").is_file()
+        and not (qiju_paths.project_qiju_dir / "config.json").is_file()
     ):
         raise SystemExit(
-            "kedu log: could not determine the project root, so refusing to create a new "
-            f"identity from {kedu_paths.project_root}.\n"
-            "Run `kedu init` in your project root, pass --project <slug>, or set "
-            "KEDU_PROJECT_ROOT."
+            "qiju log: could not determine the project root, so refusing to create a new "
+            f"identity from {qiju_paths.project_root}.\n"
+            "Run `qiju init` in your project root, pass --project <slug>, or set "
+            "QIJU_PROJECT_ROOT."
         )
-    paths_mod.ensure_base_dirs(kedu_paths)
+    paths_mod.ensure_base_dirs(qiju_paths)
     explicit_entry_id = str(raw.get("id", "")).strip() if raw.get("id") else None
     entry = prepare_entry(
         raw,
         source=source,
-        project=kedu_paths.project,
+        project=qiju_paths.project,
         agent=agent,
         entry_id=explicit_entry_id,
     )
 
-    with util.exclusive_lock(kedu_paths.lock_file):
-        entry_id = explicit_entry_id or id_gen.make_id(kedu_paths, explicit_session_uuid=session_id)
+    with util.exclusive_lock(qiju_paths.lock_file):
+        entry_id = explicit_entry_id or id_gen.make_id(qiju_paths, explicit_session_uuid=session_id)
         entry["id"] = entry_id
         schema.validate(entry)
-        locations = id_locations(kedu_paths, entry_id)
+        locations = id_locations(qiju_paths, entry_id)
         if not explicit_entry_id and locations:
-            raise RuntimeError(f"generated duplicate Kedu id: {entry_id}")
+            raise RuntimeError(f"generated duplicate Qiju id: {entry_id}")
         if "archive" in locations:
             return entry_id
         if "short" not in locations:
-            util.append_jsonl(kedu_paths.short_jsonl, entry)
+            util.append_jsonl(qiju_paths.short_jsonl, entry)
         if "long" not in locations:
-            util.append_jsonl(kedu_paths.long_jsonl, entry)
+            util.append_jsonl(qiju_paths.long_jsonl, entry)
 
     return entry_id

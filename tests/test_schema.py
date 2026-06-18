@@ -51,9 +51,9 @@ def test_normalize_entry_fills_expected_defaults():
     assert entry["body_md"] == ""
 
 
-def test_id_generation_is_deterministic_for_explicit_session(kedu_env):
-    kedu_paths = paths.resolve_paths(project="repo", cwd=kedu_env["project"])
-    assert id_gen.make_id(kedu_paths, explicit_session_uuid="abc", explicit_seq=2) == "abc:2"
+def test_id_generation_is_deterministic_for_explicit_session(qiju_env):
+    qiju_paths = paths.resolve_paths(project="repo", cwd=qiju_env["project"])
+    assert id_gen.make_id(qiju_paths, explicit_session_uuid="abc", explicit_seq=2) == "abc:2"
 
 
 def test_schema_rejects_unparseable_ts():

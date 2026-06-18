@@ -7,11 +7,11 @@ import pytest
 
 
 @pytest.fixture
-def kedu_env(tmp_path, monkeypatch):
-    home = tmp_path / "kedu-home"
+def qiju_env(tmp_path, monkeypatch):
+    home = tmp_path / "qiju-home"
     project = tmp_path / "repo"
     project.mkdir()
-    monkeypatch.setenv("KEDU_HOME", str(home))
+    monkeypatch.setenv("QIJU_HOME", str(home))
     return {"home": home, "project": project}
 
 

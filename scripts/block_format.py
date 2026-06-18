@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-KEDU_BLOCK_START = "<!-- kedu:start -->"
-KEDU_BLOCK_END = "<!-- kedu:end -->"
-CLAUDE_BLOCK_START = "====kedu start ===="
-CLAUDE_BLOCK_STOP_PREFIX = "====kedu stop line:"
+QIJU_BLOCK_START = "<!-- qiju:start -->"
+QIJU_BLOCK_END = "<!-- qiju:end -->"
+CLAUDE_BLOCK_START = "====qiju start ===="
+CLAUDE_BLOCK_STOP_PREFIX = "====qiju stop line:"
 
 
 def find_line_marked_block(content: str) -> tuple[int, int] | None:

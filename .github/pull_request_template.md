@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to Kedu! Keep PRs focused — one change per PR. -->
+<!-- Thanks for contributing to Qiju! Keep PRs focused — one change per PR. -->
 
 ## What does this PR do?
 

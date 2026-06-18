@@ -15,8 +15,8 @@ dist/
 # OS
 .DS_Store
 
-# Kedu instance/runtime data (never ship records or per-agent wiring)
-.kedu/
+# Qiju instance/runtime data (never ship records or per-agent wiring)
+.qiju/
 .claude/
 .kiro/
 .cursor/
