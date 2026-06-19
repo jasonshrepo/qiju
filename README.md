@@ -44,6 +44,7 @@ it, whether it was verified, and who continues next.*
 - [The idea](#the-idea)
 - [What QiJu does](#what-qiju-does)
 - [What QiJu is not](#what-qiju-is-not)
+- [QiJu vs. session-sharing tools](#qiju-vs-session-sharing-tools)
 - [Current status](#current-status)
 - [Known limits](#known-limits)
 - [Try it from source](#try-it-from-source)
@@ -174,6 +175,35 @@ edit or redact anything.
 | Chat history | Not a transcript dump. Intentional, structured records of decisions, evidence, and next steps. |
 | An agent framework | It doesn't run or steer agents. It records sessions and hands context to whatever agent you use. |
 | Platform memory | Your records are local files you own — not memory held on a vendor's servers. |
+| A sharing / presentation surface (e.g. [Claude Code Artifacts](https://code.claude.com/docs/en/artifacts)) | It doesn't publish a web page for a human to look at. It writes machine-readable records so the *next agent* can continue. See [QiJu vs. session-sharing tools](#qiju-vs-session-sharing-tools). |
+
+## QiJu vs. session-sharing tools
+
+Tools like **[Claude Code Artifacts](https://code.claude.com/docs/en/artifacts)** also "capture
+what happened in a session," so it's worth being precise about the difference. They solve
+opposite halves of the problem:
+
+- **Artifacts is a *presentation* layer for humans.** It turns session output into a live,
+  interactive web page at a private URL so a *teammate* can look at it — an annotated diff, a
+  dashboard, options side by side.
+- **QiJu is a *record* layer for agents.** It writes durable, machine-readable records so the
+  *next agent* — in any tool — can verify the evidence and continue the work.
+
+| | **QiJu (起居)** | **Claude Code Artifacts** |
+|---|---|---|
+| **Purpose** | Lossless session record → agent handoff & continuity | Turn session output into a shareable web page |
+| **Primary consumer** | The next AI agent (and you, auditing) | Human reviewers / teammates |
+| **Output** | Plain JSONL / Markdown / Parquet records | One self-contained HTML/Markdown page |
+| **Where it lives** | Local — `.qiju/` + `~/.qiju`, files you own | Anthropic infra (claude.ai), private URL |
+| **Persistence** | Permanent, tiered; never auto-evicted | Versioned page with an org retention policy |
+| **Sharing** | Travels with the repo (git); cross-tool, cross-vendor | Within your org only; sign-in required |
+| **Lock-in** | None — Claude Code, Codex, Kiro, Cursor | Anthropic-only; Team/Enterprise plan + claude.ai login |
+| **Retrieval** | Deterministic keyword/tag/regex search | None — a page is viewed, not queried |
+| **Cost** | Free, open source (Apache-2.0) | Paid plan, beta |
+
+The two are **complementary, not competing**: publish an Artifact so a human can review the
+work *now*, and run `/qiju-log` so the next agent can pick it up *later*. Artifact = the
+meeting slide; QiJu = the court diary. One is shown and discarded; one is kept and read back.
 
 ## Current status
 
