@@ -23,14 +23,14 @@ log "Sdist: $(basename "$SDIST")"
 WHEEL_FILES="$(python3 -c "
 import zipfile, sys
 with zipfile.ZipFile('$WHEEL') as z:
-    names = sorted(n for n in z.namelist() if not n.endswith('/'))
+    names = [n for n in z.namelist() if not n.endswith('/')]
     print('\n'.join(names))
-")"
+" | LC_ALL=C sort)"
 
 EXPECTED_WHEEL="$SCRIPT_DIR/expected-wheel-files.txt"
 # Fail if the expected list is missing — it must be reviewed and committed, not auto-generated.
 [ -f "$EXPECTED_WHEEL" ] || die "expected-wheel-files.txt is missing. Generate with: bash packaging/pypi/generate_expected.sh $DIST_DIR $VERSION"
-EXPECTED="$(grep -v '^#' "$EXPECTED_WHEEL" | grep -v '^$' | sort)"
+EXPECTED="$(grep -v '^#' "$EXPECTED_WHEEL" | grep -v '^$' | LC_ALL=C sort)"
 if [ "$WHEEL_FILES" != "$EXPECTED" ]; then
   echo "Wheel file list MISMATCH" >&2
   echo "=== Got ===" >&2
@@ -42,11 +42,11 @@ fi
 log "Wheel file list matches expected-wheel-files.txt"
 
 # ── Sdist contents ────────────────────────────────────────────────────────────
-SDIST_FILES="$(tar tzf "$SDIST" | grep -v '/$' | sort)"
+SDIST_FILES="$(tar tzf "$SDIST" | grep -v '/$' | LC_ALL=C sort)"
 
 EXPECTED_SDIST="$SCRIPT_DIR/expected-sdist-files.txt"
 [ -f "$EXPECTED_SDIST" ] || die "expected-sdist-files.txt is missing. Generate with: bash packaging/pypi/generate_expected.sh $DIST_DIR $VERSION"
-EXPECTED="$(grep -v '^#' "$EXPECTED_SDIST" | grep -v '^$' | sort)"
+EXPECTED="$(grep -v '^#' "$EXPECTED_SDIST" | grep -v '^$' | LC_ALL=C sort)"
 if [ "$SDIST_FILES" != "$EXPECTED" ]; then
   echo "Sdist file list MISMATCH" >&2
   echo "=== Got ===" >&2

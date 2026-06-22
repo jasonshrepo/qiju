@@ -17,12 +17,12 @@ SDIST="$DIST_DIR/qiju-${VERSION}.tar.gz"
 python3 -c "
 import zipfile
 with zipfile.ZipFile('$WHEEL') as z:
-    names = sorted(n for n in z.namelist() if not n.endswith('/'))
+    names = [n for n in z.namelist() if not n.endswith('/')]
     print('\n'.join(names))
-" > "$SCRIPT_DIR/expected-wheel-files.txt"
+" | LC_ALL=C sort > "$SCRIPT_DIR/expected-wheel-files.txt"
 echo "Written: $SCRIPT_DIR/expected-wheel-files.txt"
 
-tar tzf "$SDIST" | grep -v '/$' | sort > "$SCRIPT_DIR/expected-sdist-files.txt"
+tar tzf "$SDIST" | grep -v '/$' | LC_ALL=C sort > "$SCRIPT_DIR/expected-sdist-files.txt"
 echo "Written: $SCRIPT_DIR/expected-sdist-files.txt"
 
 echo ""

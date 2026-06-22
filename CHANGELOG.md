@@ -6,6 +6,16 @@ All notable changes to QiJu are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-22
+
+### Changed
+- **README and PyPI metadata updated for public release** — `uv tool install qiju` is now
+  the primary installation path, with `pipx install qiju`, `pip install qiju`, and
+  `uvx qiju --help` documented as alternatives. The `git clone` + `bash install.sh` path
+  is moved to a clearly labeled "Source install" subsection (still needed for macOS
+  launchd or contributing). All claims of source-only or no package-manager release
+  removed. No code or behavior changes.
+
 ## [0.5.1] - 2026-06-22
 
 ### Changed

@@ -47,7 +47,7 @@ it, whether it was verified, and who continues next.*
 - [QiJu vs. session-sharing tools](#qiju-vs-session-sharing-tools)
 - [Current status](#current-status)
 - [Known limits](#known-limits)
-- [Try it from source](#try-it-from-source)
+- [Install](#install)
 - [Using QiJu](#using-qiju)
 - [Design principles](#design-principles)
 - [Solution architecture](#solution-architecture)
@@ -83,9 +83,10 @@ The whole loop — install, wire it into an agent, save a record, and have the *
 read it back:
 
 ```bash
-# 1. Install from source (adds `qiju` to ~/.local/bin, engine to ~/.qiju/qiju)
-git clone https://github.com/jasonshrepo/qiju.git
-cd qiju && bash install.sh
+# 1. Install
+uv tool install qiju         # recommended
+# pipx install qiju          # alternative
+# pip install qiju           # alternative, inside an active venv
 
 # 2. Wire it into a real project (pick your host: claude | codex | kiro | cursor)
 cd /path/to/your/project
@@ -107,7 +108,7 @@ Open a *different* agent in the same project later, and ask it to pick up where 
 That's it — the record is a plain file in `.qiju/` and `~/.qiju` that any agent can read.
 The project `.qiju/` is developer-owned, cross-agent session memory — it travels with the
 repo, not with a vendor. See [Using QiJu](#using-qiju) for the per-host commands
-(`/qiju-log`, `/qiju-search`, `/qiju-review`) and [Try it from source](#try-it-from-source) for install
+(`/qiju-log`, `/qiju-search`, `/qiju-review`) and [Install](#install) for install
 details.
 
 ## Why QiJu
@@ -207,8 +208,7 @@ meeting slide; QiJu = the court diary. One is shown and discarded; one is kept a
 
 ## Current status
 
-QiJu is a **source-first developer preview**. You install it from this repository; there is
-no public package-manager release yet.
+QiJu is in **developer preview** and is available on PyPI.
 
 What works today, and is covered by the test suite (`uv run pytest`):
 
@@ -224,8 +224,6 @@ What works today, and is covered by the test suite (`uv run pytest`):
 
 QiJu is deliberately small, and this is an early preview. Be aware that:
 
-- **Source-first install only.** You install from this repo with `bash install.sh`. There is
-  no `pip install qiju`, `brew install qiju`, or `npm install -g qiju` yet.
 - **Deterministic retrieval, not semantic search.** Search matches exact keywords, tags, and
   regex — there are no embeddings, vector similarity, or relevance ranking. The model judges
   relevance after QiJu returns candidates.
@@ -236,10 +234,36 @@ QiJu is deliberately small, and this is an early preview. Be aware that:
 - **Developer preview.** Record formats, the CLI surface, and host wiring may still change
   between versions; expect rough edges and please file issues.
 
-## Try it from source
+## Install
 
-> Source-first only for now. There is no `npm install -g qiju`, `brew install qiju`, or
-> `pip install qiju` yet.
+### Package manager (recommended)
+
+```bash
+uv tool install qiju
+```
+
+Alternatives:
+
+```bash
+pipx install qiju          # if you use pipx
+pip install qiju           # plain pip, inside an active venv
+uvx qiju --help            # one-off run without a persistent install
+```
+
+Check it's working:
+
+```bash
+qiju --version
+qiju --help
+```
+
+Records are stored under `~/.qiju` by default. Override with `export QIJU_HOME=/path/to/store`.
+
+### Source install (macOS launchd or contributing)
+
+The package-manager install covers all use cases for QiJu as a tool. The source
+install is needed for two specific cases: running the macOS scheduled-maintenance
+launchd agent, or working on QiJu itself.
 
 ```bash
 git clone https://github.com/jasonshrepo/qiju.git
@@ -248,17 +272,11 @@ cd qiju
 # Installs the `qiju` command (to ~/.local/bin) and an engine copy (to ~/.qiju/qiju)
 bash install.sh
 
-# Optional: macOS scheduled maintenance
+# Optional: macOS scheduled maintenance via launchd
 bash install.sh --install-launchd
 ```
 
-Make sure `~/.local/bin` is on your `PATH`, then check it's working:
-
-```bash
-qiju --help
-```
-
-Records are stored under `~/.qiju` by default. Override with `export QIJU_HOME=/path/to/store`.
+Make sure `~/.local/bin` is on your `PATH`.
 
 **Working on QiJu itself:**
 
