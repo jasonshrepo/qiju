@@ -15,6 +15,9 @@ All notable changes to QiJu are documented here. The format is based on
   is moved to a clearly labeled "Source install" subsection (still needed for macOS
   launchd or contributing). All claims of source-only or no package-manager release
   removed. No code or behavior changes.
+- **Deterministic builds** — `build.sh` now sets `SOURCE_DATE_EPOCH` to the last
+  `release/` git commit timestamp before invoking `uv build`, so successive builds from
+  the same source produce identical byte-for-byte artifacts.
 
 ## [0.5.1] - 2026-06-22
 

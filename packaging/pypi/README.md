@@ -23,6 +23,9 @@ This produces:
 - `pypi-build/dist/qiju-<VERSION>.tar.gz`
 - `pypi-build/dist/SHA256SUMS`
 
+`build.sh` sets `SOURCE_DATE_EPOCH` to the last `release/` git commit timestamp before
+invoking `uv build`, so successive builds from the same source produce identical bytes.
+
 ### 2. Local smoke test (no upload)
 
 ```bash

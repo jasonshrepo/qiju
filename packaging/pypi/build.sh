@@ -76,10 +76,54 @@ else
   log "Skipping security scan (--skip-scan)"
 fi
 
-# ── Step 6: Build wheel and sdist ─────────────────────────────────────────────
+# ── Step 6: Build wheel and sdist (deterministic via SOURCE_DATE_EPOCH) ───────
 log "Building wheel and sdist"
 UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
+# Pin archive entry timestamps to the last release/ commit so successive builds
+# from the same source produce identical bytes (D14).
+SOURCE_DATE_EPOCH="$(git -C "$RELEASE_DIR" log -1 --format=%ct)"
+export SOURCE_DATE_EPOCH
+log "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH (last release/ commit)"
 (cd "$STAGING_DIR" && "$UV" build --out-dir "$DIST_DIR")
+
+# Normalize the sdist for deterministic bytes (D14):
+# - SOURCE_DATE_EPOCH covers source-file tar entry timestamps, but setuptools-
+#   generated files (setup.cfg, PKG-INFO, egg-info) still get wall-clock mtimes.
+# - The gzip wrapper header also records the current compression time.
+# Fix: re-pack the tar with all entry mtimes pinned to SOURCE_DATE_EPOCH,
+# then recompress with a fixed gzip header mtime.
+SDIST="$DIST_DIR/qiju-${VERSION}.tar.gz"
+python3 - "$SDIST" <<PYEOF
+import gzip, io, os, sys, tarfile
+path = sys.argv[1]
+epoch = int(os.environ["SOURCE_DATE_EPOCH"])
+# Decompress
+with open(path, "rb") as f:
+    raw_tar = gzip.decompress(f.read())
+# Repack tar: normalize all entry mtimes, uid/gid, sort by name
+tar_buf = io.BytesIO()
+with tarfile.open(fileobj=io.BytesIO(raw_tar), mode="r:") as src:
+    members = sorted(src.getmembers(), key=lambda m: m.name)
+    with tarfile.open(fileobj=tar_buf, mode="w:", format=tarfile.PAX_FORMAT) as dst:
+        for m in members:
+            m.mtime = epoch
+            m.uid = 0
+            m.gid = 0
+            m.uname = ""
+            m.gname = ""
+            # PAX format uses pax_headers["mtime"] over m.mtime — clear it
+            # so our integer epoch is what gets written.
+            m.pax_headers = {}
+            fobj = src.extractfile(m) if m.isfile() else None
+            dst.addfile(m, fobj)
+# Recompress with fixed gzip header mtime
+buf = io.BytesIO()
+with gzip.GzipFile(filename="", mode="wb", mtime=epoch, fileobj=buf) as gz:
+    gz.write(tar_buf.getvalue())
+with open(path, "wb") as f:
+    f.write(buf.getvalue())
+PYEOF
+log "Normalized sdist tar entries + gzip header to SOURCE_DATE_EPOCH"
 
 # ── Step 7: Verify artifacts ──────────────────────────────────────────────────
 log "Verifying artifacts"
