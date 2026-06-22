@@ -137,9 +137,9 @@ case "$MODE" in
   --test-pypi)
     [ -n "${TESTPYPI_TOKEN:-}" ] || die "TESTPYPI_TOKEN env var not set"
     log "Uploading to TestPyPI"
+    # Token via env var only — never --token on CLI (D12: token must not appear in process args)
     # Pass explicit globs — never dist/* which would include SHA256SUMS
-    "$UV" publish \
-      --token "$TESTPYPI_TOKEN" \
+    UV_PUBLISH_TOKEN="$TESTPYPI_TOKEN" "$UV" publish \
       --publish-url https://test.pypi.org/legacy/ \
       "$DIST_DIR"/*.whl "$DIST_DIR"/*.tar.gz
     log "Uploaded. Install from TestPyPI with dual-index (qiju from TestPyPI, duckdb from prod):"
@@ -153,8 +153,8 @@ case "$MODE" in
       die "qiju already exists on PyPI — check before uploading"
     fi
     log "Uploading to production PyPI"
-    "$UV" publish \
-      --token "$PYPI_TOKEN" \
+    # Token via env var only — never --token on CLI (D12)
+    UV_PUBLISH_TOKEN="$PYPI_TOKEN" "$UV" publish \
       "$DIST_DIR"/*.whl "$DIST_DIR"/*.tar.gz
     log "Published qiju $VERSION to PyPI"
     ;;

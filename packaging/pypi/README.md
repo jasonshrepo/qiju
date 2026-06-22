@@ -29,8 +29,10 @@ This produces:
 bash development/packaging/pypi/publish.sh --smoke
 ```
 
-Tests all four hosts (`claude`, `codex`, `kiro`, `cursor`) from the installed wheel,
-using a temporary `QIJU_HOME` — never touching `~/.qiju`.
+Tests all four hosts (`claude`, `codex`, `kiro`, `cursor`) from the installed wheel.
+Full isolation: both `HOME` and `QIJU_HOME` are exported to isolated temporary
+directories — no real `~/.qiju`, `~/.claude`, `~/.codex`, `~/.kiro`, or `~/.cursor`
+files are read or written.
 
 ### 3. TestPyPI (dual-index: qiju from TestPyPI, duckdb from prod PyPI)
 
@@ -78,6 +80,11 @@ Three scan categories:
 
 ## File lists
 
-`expected-wheel-files.txt` and `expected-sdist-files.txt` are generated on first build
-and checked on subsequent builds. After a file set change (deliberate), review and commit
-the updated lists.
+`expected-wheel-files.txt` and `expected-sdist-files.txt` are **committed allowlists**.
+`verify_artifact.sh` hard-fails if either is missing — there is no auto-generation
+fallback. After a deliberate file-set change, regenerate them and commit the result:
+
+```bash
+bash development/packaging/pypi/generate_expected.sh pypi-build/dist <VERSION>
+git diff packaging/pypi/expected-*.txt   # review before committing
+```

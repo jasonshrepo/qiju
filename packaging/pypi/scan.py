@@ -7,9 +7,9 @@ Usage:
 Exits 0 if clean, 1 if any issues are found.
 
 Categories:
-  1. blocked-local-identifiers   — substrings that must never appear in wheel source
-  2. credential-patterns         — regex patterns for tokens, keys, emails
-  3. (approved-public-identifiers are NOT scanned for; they are exemptions for category 2)
+  1. blocked-local-identifiers    — substrings that must never appear in wheel source
+  2. credential-patterns          — regex patterns for tokens, keys, emails
+  3. approved-public-identifiers  — exemptions for category 2 credential-pattern matches
 """
 from __future__ import annotations
 
@@ -22,9 +22,8 @@ PACKAGING_DIR = Path(__file__).resolve().parent
 SKIP_EXTENSIONS = {".pyc", ".pyo", ".duckdb", ".db", ".so", ".dylib", ".dll", ".exe"}
 SKIP_DIRS = {"__pycache__", ".git"}
 
-# Allowlisted substrings that a credential pattern might match but are safe.
-# These are patterns that appear in redaction_rules.json or init_cmd.py as examples/docs.
-_ALLOWLISTED_SNIPPETS = [
+# Hardcoded exemptions for doc/example email patterns in redaction_rules.json and init_cmd.py.
+_EXAMPLE_EMAIL_SNIPPETS = [
     "example@",
     "user@example",
     "user@host",
@@ -43,20 +42,35 @@ def _load_blocked(path: Path) -> list[str]:
     return lines
 
 
+def _load_approved(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    lines = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            lines.append(line)
+    return lines
+
+
 def _load_credential_patterns(path: Path) -> list[tuple[str, re.Pattern[str]]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     return [(item["name"], re.compile(item["pattern"])) for item in data]
 
 
-def _is_allowlisted(match: str) -> bool:
+def _is_allowlisted(match: str, approved: list[str]) -> bool:
     low = match.lower()
-    return any(snippet.lower() in low for snippet in _ALLOWLISTED_SNIPPETS)
+    return (
+        any(snippet.lower() in low for snippet in _EXAMPLE_EMAIL_SNIPPETS)
+        or any(identifier.lower() in low for identifier in approved)
+    )
 
 
 def _scan_file(
     path: Path,
     blocked: list[str],
     cred_patterns: list[tuple[str, re.Pattern[str]]],
+    approved: list[str],
 ) -> list[str]:
     issues = []
     try:
@@ -72,7 +86,7 @@ def _scan_file(
     for name, pattern in cred_patterns:
         for match in pattern.finditer(text):
             matched_text = match.group(0)
-            if not _is_allowlisted(matched_text):
+            if not _is_allowlisted(matched_text, approved):
                 lineno = text[: match.start()].count("\n") + 1
                 issues.append(f"  CREDENTIAL-PATTERN [{name}] at {path}:{lineno}: {matched_text[:60]!r}")
 
@@ -81,6 +95,7 @@ def _scan_file(
 
 def scan(staging_dir: Path) -> list[str]:
     blocked = _load_blocked(PACKAGING_DIR / "blocked_local_identifiers.txt")
+    approved = _load_approved(PACKAGING_DIR / "approved_public_identifiers.txt")
     cred_patterns = _load_credential_patterns(PACKAGING_DIR / "credential_patterns.json")
 
     all_issues: list[str] = []
@@ -91,7 +106,7 @@ def scan(staging_dir: Path) -> list[str]:
         elif fpath.suffix in SKIP_EXTENSIONS:
             continue
         elif fpath.is_file():
-            issues = _scan_file(fpath, blocked, cred_patterns)
+            issues = _scan_file(fpath, blocked, cred_patterns, approved)
             all_issues.extend(issues)
 
     return all_issues
