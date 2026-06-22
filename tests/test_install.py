@@ -25,7 +25,7 @@ root="$(pwd)"
 mkdir -p "$root/.venv/bin"
 cat > "$root/.venv/bin/qiju" <<'SH'
 #!/usr/bin/env bash
-exec "{sys.executable}" "__QIJU_ROOT__/scripts/qiju.py" "$@"
+exec "{sys.executable}" -c "import sys; sys.path.insert(0,'__QIJU_ROOT__/src'); from qiju.cli import main; raise SystemExit(main())" "$@"
 SH
 sed -i.bak "s#__QIJU_ROOT__#$root#g" "$root/.venv/bin/qiju"
 rm -f "$root/.venv/bin/qiju.bak"

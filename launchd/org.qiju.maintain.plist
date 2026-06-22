@@ -11,8 +11,7 @@
   </dict>
   <key>ProgramArguments</key>
   <array>
-    <string>__QIJU_PYTHON__</string>
-    <string>__QIJU_SCRIPT__</string>
+    <string>__QIJU_BIN__</string>
     <string>maintain</string>
   </array>
   <key>StartCalendarInterval</key>

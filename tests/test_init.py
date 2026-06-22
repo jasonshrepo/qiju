@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scripts import init_cmd
+from qiju import init_cmd
 
 
 def _clear_agent_envs(monkeypatch) -> None:
@@ -32,7 +32,7 @@ def test_parse_hosts_rejects_unknown_host():
 
 
 def test_cli_init_multi_host_emits_list(qiju_env, monkeypatch, capsys):
-    from scripts import qiju
+    from qiju import cli as qiju
 
     _clear_agent_envs(monkeypatch)
     monkeypatch.chdir(qiju_env["project"])
@@ -43,7 +43,7 @@ def test_cli_init_multi_host_emits_list(qiju_env, monkeypatch, capsys):
 
 
 def test_cli_init_single_host_still_emits_object(qiju_env, monkeypatch, capsys):
-    from scripts import qiju
+    from qiju import cli as qiju
 
     _clear_agent_envs(monkeypatch)
     monkeypatch.chdir(qiju_env["project"])
@@ -54,7 +54,7 @@ def test_cli_init_single_host_still_emits_object(qiju_env, monkeypatch, capsys):
 
 
 def test_cli_init_default_output_is_human_readable(qiju_env, monkeypatch, capsys):
-    from scripts import qiju
+    from qiju import cli as qiju
 
     _clear_agent_envs(monkeypatch)
     monkeypatch.chdir(qiju_env["project"])

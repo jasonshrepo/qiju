@@ -7,7 +7,7 @@ from threading import Barrier
 
 import pytest
 
-from scripts import archive, capture, maintain, paths, util
+from qiju import archive, capture, maintain, paths, util
 from tests.conftest import sample_entry
 
 

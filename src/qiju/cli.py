@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 try:
     from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage
@@ -22,8 +23,11 @@ except ImportError:  # pragma: no cover
     import storage  # type: ignore
 
 
-# Keep in sync with pyproject.toml [project].version
-QIJU_VERSION = "0.5.0"
+def get_version() -> str:
+    try:
+        return _pkg_version("qiju")
+    except PackageNotFoundError:
+        return "0.0.0+local"
 
 
 def _print_json(value) -> None:
@@ -275,6 +279,22 @@ def _print_uninstall_result(result: cleanup_mod.CleanupResult) -> None:
 
 def cmd_uninstall(args: argparse.Namespace) -> int:
     try:
+        purge = getattr(args, "purge_data", False)
+        if purge and not args.dry_run:
+            confirmed = getattr(args, "yes", False)
+            if not confirmed:
+                answer = input("Type 'yes' to permanently delete all Qiju session records: ")
+                if answer.strip().lower() != "yes":
+                    print("Aborted — records were not deleted.", file=sys.stderr)
+                    return 1
+            report = cleanup_mod.purge_data(dry_run=False)
+            _print_json(report)
+            return 0
+        if purge and args.dry_run:
+            report = cleanup_mod.purge_data(dry_run=True)
+            _print_json(report)
+            return 0
+
         user = not args.project_only
         project_root = None if args.user_only else (args.project_root or ".")
         scan_projects = bool(args.scan_projects) and not args.user_only
@@ -329,7 +349,7 @@ def cmd_projects(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="qiju")
-    parser.add_argument("--version", action="version", version=f"qiju {QIJU_VERSION}")
+    parser.add_argument("--version", action="version", version=f"qiju {get_version()}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="Enable Qiju for a host; project-local by default")
@@ -405,6 +425,8 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall_parser.add_argument("--scan-depth", type=int, default=cleanup_mod.DEFAULT_SCAN_DEPTH, help="Maximum scan depth for project discovery")
     uninstall_parser.add_argument("--bin-dir", help="Qiju shim directory, default: ~/.local/bin")
     uninstall_parser.add_argument("--install-root", help="Installed Qiju engine path, default: ~/.qiju/qiju")
+    uninstall_parser.add_argument("--purge-data", action="store_true", dest="purge_data", help="Permanently delete all session records from ~/.qiju/long and archive (requires confirmation)")
+    uninstall_parser.add_argument("--yes", "-y", action="store_true", dest="yes", help="Skip confirmation prompt (use with --purge-data)")
     uninstall_parser.set_defaults(func=cmd_uninstall)
 
     migrate_parser = subparsers.add_parser("migrate", help="Normalize project names to lowercase across stored records (one-time migration)")

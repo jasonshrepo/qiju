@@ -6,6 +6,23 @@ All notable changes to QiJu are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-22
+
+### Changed
+- **Source layout restructured to `src/qiju/`** — canonical package is now `qiju` (was
+  `scripts`); entry point changed to `qiju.cli:main`. Tests import from `qiju` directly.
+  No user-facing behavior changes.
+- **Single version source** — version is now defined only in `pyproject.toml` and read at
+  runtime via `importlib.metadata`; `QIJU_VERSION` constant removed from source.
+- **Resource loading via `importlib.resources`** — `allowlist.py` and `redact.py` now load
+  config files through `importlib.resources.files("qiju")` instead of `Path(__file__)`,
+  enabling correct loading from a wheel's site-packages.
+- **`install.sh` version derived from `pyproject.toml`** — no more hardcoded `VERSION=`;
+  launchd `ProgramArguments` now invokes the console-script entry point instead of the
+  source `scripts/qiju.py` path.
+- **Data-purge separation** — `qiju uninstall` never deletes records by default; explicit
+  `qiju uninstall --purge-data [--yes]` is the only path to remove `~/.qiju/long|archive`.
+
 ## [0.5.0] - 2026-06-22
 
 ### Added

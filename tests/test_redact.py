@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from scripts import redact, retro_redact, util
+from qiju import redact, retro_redact, util
 from tests.conftest import sample_entry
 
 

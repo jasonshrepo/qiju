@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts import qiju
+from qiju import cli as qiju
 
 
 def test_cli_program_is_qiju():
@@ -16,7 +16,7 @@ def test_cli_version_flag(capsys):
         parser.parse_args(["--version"])
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    assert out.strip() == f"qiju {qiju.QIJU_VERSION}"
+    assert out.strip() == f"qiju {qiju.get_version()}"
 
 
 def test_cli_version_matches_pyproject():
@@ -25,7 +25,7 @@ def test_cli_version_matches_pyproject():
 
     pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    assert qiju.QIJU_VERSION == data["project"]["version"]
+    assert qiju.get_version() == data["project"]["version"]
 
 
 def test_init_cli_is_local_first_with_host():
@@ -110,7 +110,7 @@ def _valid_entry_json():
 
 
 def test_log_cleanup_deletes_staged_file_after_success(qiju_env, monkeypatch, capsys):
-    from scripts import staging
+    from qiju import staging
 
     monkeypatch.chdir(qiju_env["project"])
     path = staging.allocate_staging(project=None, cwd=qiju_env["project"], agent="claude")
@@ -123,7 +123,7 @@ def test_log_cleanup_deletes_staged_file_after_success(qiju_env, monkeypatch, ca
 
 
 def test_log_cleanup_keeps_file_on_failed_log(qiju_env, monkeypatch):
-    from scripts import staging
+    from qiju import staging
 
     monkeypatch.chdir(qiju_env["project"])
     path = staging.allocate_staging(project=None, cwd=qiju_env["project"], agent="claude")
@@ -148,7 +148,7 @@ def test_log_cleanup_refuses_non_staging_body(qiju_env, monkeypatch, tmp_path, c
 
 
 def test_log_cleanup_refuses_symlink_body(qiju_env, monkeypatch, tmp_path):
-    from scripts import paths, staging
+    from qiju import paths, staging
 
     monkeypatch.chdir(qiju_env["project"])
     tmp = paths.resolve_paths(project=None, cwd=qiju_env["project"]).tmp_dir
@@ -165,7 +165,7 @@ def test_log_cleanup_refuses_symlink_body(qiju_env, monkeypatch, tmp_path):
 
 
 def test_log_cleanup_refuses_traversal_body(qiju_env, monkeypatch):
-    from scripts import paths
+    from qiju import paths
 
     monkeypatch.chdir(qiju_env["project"])
     qiju_paths = paths.resolve_paths(project=None, cwd=qiju_env["project"])

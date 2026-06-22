@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime
 
-from scripts import cleanup, init_cmd
+from qiju import cleanup, init_cmd
 
 
 def test_user_cleanup_removes_installation_but_preserves_records(qiju_env, tmp_path, monkeypatch):
@@ -433,7 +433,7 @@ def test_uninstall_cli_no_scan_projects_opt_out():
 
 
 def test_cmd_uninstall_user_only_disables_scan(qiju_env, tmp_path, monkeypatch):
-    from scripts import qiju as qiju_mod
+    from qiju import cli as qiju_mod
 
     captured = {}
 
@@ -467,7 +467,7 @@ def test_uninstall_cli_supports_project_scan_options():
 
 
 def test_uninstall_prints_human_readable_output(qiju_env, tmp_path, capsys, monkeypatch):
-    from scripts import qiju as qiju_mod
+    from qiju import cli as qiju_mod
 
     monkeypatch.setenv("AGENT_HOME", str(tmp_path / "agent-home"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
@@ -495,13 +495,130 @@ def test_uninstall_prints_human_readable_output(qiju_env, tmp_path, capsys, monk
 
 
 def test_init_cli_supports_place_alias():
-    from scripts import qiju
+    from qiju import cli as qiju
 
     args = qiju.build_parser().parse_args(["init", "--host", "claude", "--place", "global"])
     assert args.place == "global"
 
 
 def cleanup_cli_args(argv):
-    from scripts import qiju
+    from qiju import cli as qiju
 
     return qiju.build_parser().parse_args(argv)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: --purge-data lifecycle separation
+
+
+def test_purge_data_removes_long_and_archive(tmp_path):
+    long_dir = tmp_path / "long"
+    archive_dir = tmp_path / "archive"
+    long_dir.mkdir()
+    archive_dir.mkdir()
+    (long_dir / "record.duckdb").touch()
+    (archive_dir / "old.duckdb").touch()
+
+    result = cleanup.purge_data(qiju_home=tmp_path, dry_run=False)
+
+    assert not long_dir.exists()
+    assert not archive_dir.exists()
+    assert str(long_dir) in result["removed"]
+    assert str(archive_dir) in result["removed"]
+    assert result["dry_run"] is False
+
+
+def test_purge_data_dry_run_removes_nothing(tmp_path):
+    long_dir = tmp_path / "long"
+    long_dir.mkdir()
+    (long_dir / "record.duckdb").touch()
+
+    result = cleanup.purge_data(qiju_home=tmp_path, dry_run=True)
+
+    assert long_dir.exists()
+    assert str(long_dir) in result["removed"]
+    assert result["dry_run"] is True
+
+
+def test_purge_data_skips_missing_dirs(tmp_path):
+    result = cleanup.purge_data(qiju_home=tmp_path, dry_run=False)
+
+    assert result["removed"] == []
+    assert str(tmp_path / "long") in result["skipped"]
+    assert str(tmp_path / "archive") in result["skipped"]
+
+
+def test_uninstall_preserves_records_by_default(qiju_env, tmp_path, monkeypatch):
+    qiju_home = qiju_env["home"]
+    long_dir = qiju_home / "long"
+    archive_dir = qiju_home / "archive"
+    long_dir.mkdir(parents=True)
+    archive_dir.mkdir(parents=True)
+    install_root = qiju_home / "qiju"
+    install_root.mkdir(parents=True)
+    bin_dir = tmp_path / "bin"
+
+    result = cleanup.cleanup(
+        user=True,
+        project_root=None,
+        hosts=cleanup.HOSTS,
+        bin_dir=bin_dir,
+        install_root=install_root,
+        dry_run=False,
+    )
+    preserved_paths = [p["path"] for p in result.preserved]
+    assert any("long" in p for p in preserved_paths)
+    assert any("archive" in p for p in preserved_paths)
+    assert long_dir.exists()
+    assert archive_dir.exists()
+
+
+def test_purge_data_flag_dry_run_via_cli():
+    from qiju import cli as qiju
+
+    args = qiju.build_parser().parse_args(["uninstall", "--purge-data", "--dry-run"])
+    assert args.purge_data is True
+    assert args.dry_run is True
+
+
+def test_purge_data_yes_flag_via_cli():
+    from qiju import cli as qiju
+
+    args = qiju.build_parser().parse_args(["uninstall", "--purge-data", "--yes"])
+    assert args.purge_data is True
+    assert args.yes is True
+
+
+def test_cmd_purge_data_with_yes_flag(tmp_path, monkeypatch):
+    from qiju import cli as qiju_mod
+
+    qiju_home = tmp_path / ".qiju"
+    long_dir = qiju_home / "long"
+    archive_dir = qiju_home / "archive"
+    long_dir.mkdir(parents=True)
+    archive_dir.mkdir(parents=True)
+    (long_dir / "r.duckdb").touch()
+
+    monkeypatch.setattr("qiju.paths.qiju_home", lambda: qiju_home)
+
+    args = qiju_mod.build_parser().parse_args(["uninstall", "--purge-data", "--yes"])
+    rc = qiju_mod.cmd_uninstall(args)
+
+    assert rc == 0
+    assert not long_dir.exists()
+    assert not archive_dir.exists()
+
+
+def test_cmd_purge_data_aborts_without_yes(tmp_path, monkeypatch):
+    from qiju import cli as qiju_mod
+
+    qiju_home = tmp_path / ".qiju"
+    (qiju_home / "long").mkdir(parents=True)
+    monkeypatch.setattr("qiju.paths.qiju_home", lambda: qiju_home)
+    monkeypatch.setattr("builtins.input", lambda _: "no")
+
+    args = qiju_mod.build_parser().parse_args(["uninstall", "--purge-data"])
+    rc = qiju_mod.cmd_uninstall(args)
+
+    assert rc == 1
+    assert (qiju_home / "long").exists()

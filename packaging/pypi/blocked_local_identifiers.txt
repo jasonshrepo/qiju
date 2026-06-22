@@ -1,0 +1,17 @@
+# Local-only identifiers that must NOT appear in the published wheel.
+# One entry per line; lines starting with # are comments.
+# Entries are matched as substrings within source files.
+
+# Local filesystem paths (development machine)
+/Volumes/T7-APFS
+/Users/jason
+qiju-diarist/development
+qiju-diarist/release
+qiju-diarist/.archive
+
+# SSH / git remote aliases (local machine config)
+git@github.com:jasonshrepo
+
+# Local test artifacts
+pytest-of-
+/tmp/qiju-

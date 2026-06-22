@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts import capture, search, util
+from qiju import capture, search, util
 from tests.conftest import sample_entry
 
 
@@ -124,7 +124,7 @@ def test_rollup_next_steps_respects_time_filter(qiju_env):
 
 
 def test_format_actions_cli_output(qiju_env, capsys):
-    from scripts import qiju as qiju_mod
+    from qiju import cli as qiju_mod
 
     capture.log_entry(
         sample_entry(id="a:1", ts="2026-06-05T10:00:00+10:00", title="Auth work", next_steps=["Finish login"]),
@@ -163,13 +163,13 @@ def test_time_filtered_search_excludes_malformed_ts(qiju_env):
 # ---------------------------------------------------------------------------
 
 def test_slugify_project_lowercases():
-    from scripts.paths import slugify_project
+    from qiju.paths import slugify_project
     assert slugify_project("MyProject") == "myproject"
     assert slugify_project("MyProject") == "myproject"
 
 
 def test_slugify_project_separator_and_strip_unchanged():
-    from scripts.paths import slugify_project
+    from qiju.paths import slugify_project
     # Separator collapsing still works after lowercasing.
     assert slugify_project("My  Project!!") == "my-project"
     # Leading/trailing separators stripped.

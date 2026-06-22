@@ -4,10 +4,10 @@ import json
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from importlib.resources import files as _res_files
 from pathlib import Path
 
-
-DEFAULT_CONFIG = Path(__file__).resolve().parent / "config" / "allowlist.json"
+DEFAULT_CONFIG = _res_files("qiju").joinpath("config/allowlist.json")
 
 
 @dataclass
@@ -22,8 +22,8 @@ class Allowlist:
 
 
 @lru_cache(maxsize=None)
-def _load_allowlist_cached(config_path: Path) -> tuple[frozenset[str], tuple[re.Pattern[str], ...]]:
-    if not config_path.exists():
+def _load_allowlist_cached(config_path) -> tuple[frozenset[str], tuple[re.Pattern[str], ...]]:
+    if not config_path.is_file():
         return frozenset(), ()
     data = json.loads(config_path.read_text(encoding="utf-8"))
     exact = frozenset(data.get("exact", []))

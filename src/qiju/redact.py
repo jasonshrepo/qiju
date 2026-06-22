@@ -8,6 +8,7 @@ import secrets
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
+from importlib.resources import files as _res_files
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,7 @@ except ImportError:  # pragma: no cover
     import allowlist as allowlist_mod  # type: ignore
 
 
-RULES_PATH = Path(__file__).resolve().parent / "config" / "redaction_rules.json"
+RULES_PATH = _res_files("qiju").joinpath("config/redaction_rules.json")
 TOKEN_RE = re.compile(r"[A-Za-z0-9/+_.=:-]{20,}")
 
 # Random per-process salt, generated once and NEVER written to disk. Within a single

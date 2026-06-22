@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from scripts import archive, capture, maintain, paths, util
+from qiju import archive, capture, maintain, paths, util
 from tests.conftest import sample_entry
 
 

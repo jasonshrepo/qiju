@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import capture, cleanup, init_cmd, paths
+from qiju import capture, cleanup, init_cmd, paths
 
 
 def _repo_root() -> Path:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts import id_gen, paths, schema
+from qiju import id_gen, paths, schema
 from tests.conftest import sample_entry
 
 

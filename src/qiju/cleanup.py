@@ -347,6 +347,26 @@ def cleanup_project_install(
     _prune_project_qiju_to_short(qiju_paths, result, dry_run=dry_run)
 
 
+def purge_data(qiju_home: Path | None = None, *, dry_run: bool = False) -> dict:
+    """Delete the durable record stores under qiju_home (long/, archive/, short/ recursively).
+
+    This is the only path that removes session records. It is intentionally separate from
+    the host-integration cleanup so callers must explicitly opt in.
+    """
+    home = qiju_home or paths_mod.qiju_home()
+    removed: list[str] = []
+    skipped: list[str] = []
+    for name in ("long", "archive"):
+        path = home / name
+        if path.exists() and path.is_dir():
+            if not dry_run:
+                shutil.rmtree(path)
+            removed.append(str(path))
+        else:
+            skipped.append(str(path))
+    return {"dry_run": dry_run, "removed": removed, "skipped": skipped}
+
+
 def parse_hosts(value: str) -> tuple[str, ...]:
     if value == "all":
         return HOSTS

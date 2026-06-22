@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import qiju as qiju_mod, migrate as migrate_mod, search, util
+from qiju import cli as qiju_mod, migrate as migrate_mod, search, util
 from tests.conftest import sample_entry
 
 
@@ -237,7 +237,7 @@ class TestArchiveTierMigration:
         except ImportError:
             pytest.skip("duckdb not installed")
 
-        from scripts import archive as archive_mod
+        from qiju import archive as archive_mod
 
         home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"
@@ -280,7 +280,7 @@ class TestArchiveTierMigration:
         except ImportError:
             pytest.skip("duckdb not installed")
 
-        from scripts import archive as archive_mod
+        from qiju import archive as archive_mod
 
         home = tmp_path / "qiju-home"
         project_root = tmp_path / "myrepo"

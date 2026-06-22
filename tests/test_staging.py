@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import paths, staging
+from qiju import paths, staging
 
 
 def _tmp_dir(qiju_env) -> Path:
@@ -132,7 +132,7 @@ def test_concurrent_same_label_writers_no_loss(qiju_env):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
-    from scripts import capture, util
+    from qiju import capture, util
 
     barrier = Barrier(2)
 
@@ -165,7 +165,7 @@ def test_concurrent_cross_agent_writers_no_loss(qiju_env):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
-    from scripts import capture, util
+    from qiju import capture, util
 
     barrier = Barrier(2)
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.4.0"
 BIN_DIR="${QIJU_BIN_DIR:-$HOME/.local/bin}"
 QIJU_HOME="${QIJU_HOME:-$HOME/.qiju}"
 INSTALL_ROOT="${QIJU_INSTALL_ROOT:-}"
@@ -79,6 +78,7 @@ script_dir() {
 }
 
 SOURCE_DIR="$(script_dir)"
+VERSION="$(grep -m1 '^version' "$SOURCE_DIR/pyproject.toml" | cut -d'"' -f2)"
 
 if [ -n "${QIJU_PROJECT_DIR:-}" ]; then
   PROJECT_EXPLICIT=1
@@ -280,8 +280,7 @@ install_launchd() {
 
   local target_dir="$HOME/Library/LaunchAgents"
   local target_plist="$target_dir/$LAUNCHD_LABEL.plist"
-  local python_bin="$INSTALL_ROOT/.venv/bin/python"
-  local qiju_script="$INSTALL_ROOT/scripts/qiju.py"
+  local qiju_bin="$INSTALL_ROOT/.venv/bin/qiju"
   local log_dir="$QIJU_HOME/logs"
 
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -305,8 +304,7 @@ install_launchd() {
   </dict>
   <key>ProgramArguments</key>
   <array>
-    <string>$python_bin</string>
-    <string>$qiju_script</string>
+    <string>$qiju_bin</string>
     <string>maintain</string>
   </array>
   <key>StartCalendarInterval</key>
