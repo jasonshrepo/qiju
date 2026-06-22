@@ -78,6 +78,122 @@ def test_show_bare_uuid_not_found_message(qiju_env, capsys):
     assert "qiju search" in err
 
 
+def test_temp_entry_prints_unique_staging_path(qiju_env, monkeypatch, capsys):
+    monkeypatch.chdir(qiju_env["project"])
+    args = qiju.build_parser().parse_args(["temp-entry", "--agent", "claude"])
+    assert qiju.cmd_temp_entry(args) == 0
+    first = capsys.readouterr().out.strip()
+    from pathlib import Path
+
+    p = Path(first)
+    assert p.exists() and p.read_text() == ""
+    assert p.parent.name == "tmp" and p.parent.parent.name == ".qiju"
+    assert p.name.startswith("qiju-entry.claude.") and p.name.endswith(".json")
+
+    assert qiju.cmd_temp_entry(args) == 0
+    second = capsys.readouterr().out.strip()
+    assert first != second
+
+
+def _valid_entry_json():
+    import json
+
+    return json.dumps(
+        {
+            "title": "cleanup test",
+            "tags": ["t"],
+            "search_terms": ["s"],
+            "next_steps": [],
+            "body_md": "body",
+        }
+    )
+
+
+def test_log_cleanup_deletes_staged_file_after_success(qiju_env, monkeypatch, capsys):
+    from scripts import staging
+
+    monkeypatch.chdir(qiju_env["project"])
+    path = staging.allocate_staging(project=None, cwd=qiju_env["project"], agent="claude")
+    path.write_text(_valid_entry_json(), encoding="utf-8")
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--agent", "claude", "--project", "repo", "--body", str(path), "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 0
+    assert not path.exists()
+
+
+def test_log_cleanup_keeps_file_on_failed_log(qiju_env, monkeypatch):
+    from scripts import staging
+
+    monkeypatch.chdir(qiju_env["project"])
+    path = staging.allocate_staging(project=None, cwd=qiju_env["project"], agent="claude")
+    path.write_text("not valid json", encoding="utf-8")
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--body", str(path), "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 1
+    assert path.exists()  # never deleted because the log failed
+
+
+def test_log_cleanup_refuses_non_staging_body(qiju_env, monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(qiju_env["project"])
+    body = tmp_path / "record.json"
+    body.write_text(_valid_entry_json(), encoding="utf-8")
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--project", "repo", "--body", str(body), "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 0  # log succeeds
+    assert body.exists()  # arbitrary user file not deleted
+    assert "--cleanup skipped" in capsys.readouterr().err
+
+
+def test_log_cleanup_refuses_symlink_body(qiju_env, monkeypatch, tmp_path):
+    from scripts import paths, staging
+
+    monkeypatch.chdir(qiju_env["project"])
+    tmp = paths.resolve_paths(project=None, cwd=qiju_env["project"]).tmp_dir
+    tmp.mkdir(parents=True, exist_ok=True)
+    target = tmp_path / "payload.json"
+    target.write_text(_valid_entry_json(), encoding="utf-8")
+    link = tmp / "qiju-entry.claude.link.json"
+    link.symlink_to(target)
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--project", "repo", "--body", str(link), "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 0
+    assert link.exists() and target.exists()  # symlink redirect refused
+
+
+def test_log_cleanup_refuses_traversal_body(qiju_env, monkeypatch):
+    from scripts import paths
+
+    monkeypatch.chdir(qiju_env["project"])
+    qiju_paths = paths.resolve_paths(project=None, cwd=qiju_env["project"])
+    qiju_paths.tmp_dir.mkdir(parents=True, exist_ok=True)
+    # A real, valid file one level above tmp/, reached via a `../` traversal that escapes
+    # the staging dir. The log must succeed but cleanup must refuse (realpath lands outside).
+    escaped = qiju_paths.project_qiju_dir / "qiju-entry.claude.evil.json"
+    escaped.write_text(_valid_entry_json(), encoding="utf-8")
+    traversal = qiju_paths.tmp_dir / ".." / "qiju-entry.claude.evil.json"
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--project", "repo", "--body", str(traversal), "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 0
+    assert escaped.exists()  # traversal target not deleted
+
+
+def test_log_cleanup_with_stdin_is_noop(qiju_env, monkeypatch, capsys):
+    import io
+
+    monkeypatch.chdir(qiju_env["project"])
+    monkeypatch.setattr("sys.stdin", io.StringIO(_valid_entry_json()))
+    args = qiju.build_parser().parse_args(
+        ["log", "--source", "manual", "--project", "repo", "--cleanup"]
+    )
+    assert qiju.cmd_log(args) == 0  # log via stdin succeeds
+    assert "--cleanup skipped" in capsys.readouterr().err  # nothing to clean, warned
+
+
 def test_parse_fields_splits_and_trims():
     assert qiju._parse_fields("title, ts , next_steps") == ["title", "ts", "next_steps"]
     assert qiju._parse_fields("") is None

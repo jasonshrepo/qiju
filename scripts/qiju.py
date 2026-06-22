@@ -7,7 +7,7 @@ import os
 import sys
 
 try:
-    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, storage
+    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage
 except ImportError:  # pragma: no cover
     import capture  # type: ignore
     import cleanup as cleanup_mod  # type: ignore
@@ -18,11 +18,12 @@ except ImportError:  # pragma: no cover
     import retro_redact  # type: ignore
     import schema  # type: ignore
     import search  # type: ignore
+    import staging  # type: ignore
     import storage  # type: ignore
 
 
 # Keep in sync with pyproject.toml [project].version
-QIJU_VERSION = "0.4.0"
+QIJU_VERSION = "0.5.0"
 
 
 def _print_json(value) -> None:
@@ -84,9 +85,23 @@ def cmd_log(args: argparse.Namespace) -> int:
             session_id=args.session_id,
         )
         print(entry_id)
+        if args.cleanup:
+            deleted, reason = staging.safe_cleanup(args.body, project=args.project, cwd=None)
+            if not deleted and reason:
+                print(f"qiju log: --cleanup skipped: {reason}", file=sys.stderr)
         return 0
     except (ValueError, schema.ValidationError, OSError, json.JSONDecodeError) as exc:
         print(f"qiju log: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_temp_entry(args: argparse.Namespace) -> int:
+    try:
+        path = staging.allocate_staging(project=args.project, cwd=None, agent=args.agent)
+        print(path)  # bare path only, no decoration (design §3.1)
+        return 0
+    except Exception as exc:
+        print(f"qiju temp-entry: {exc}", file=sys.stderr)
         return 1
 
 
@@ -331,8 +346,14 @@ def build_parser() -> argparse.ArgumentParser:
     log_parser.add_argument("--agent", help="Agent/host identity, e.g. claude-code, codex, kiro")
     log_parser.add_argument("--project")
     log_parser.add_argument("--body", help="Path to JSON entry. Reads stdin when omitted.")
+    log_parser.add_argument("--cleanup", action="store_true", help="After a successful log, delete the --body file if it is a Qiju-managed staging file")
     log_parser.add_argument("--session-id")
     log_parser.set_defaults(func=cmd_log)
+
+    temp_parser = subparsers.add_parser("temp-entry", help="Allocate a unique workspace-local staging file for qiju log")
+    temp_parser.add_argument("--agent", help="Agent/host label for the staging filename (cosmetic; defaults to $QIJU_AGENT)")
+    temp_parser.add_argument("--project")
+    temp_parser.set_defaults(func=cmd_temp_entry)
 
     search_parser = subparsers.add_parser("search", help="Find candidate Qiju records")
     search_parser.add_argument("--scope", default="current_project")

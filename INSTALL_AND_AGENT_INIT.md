@@ -88,8 +88,10 @@ QiJu intentionally does not create a provider-specific Kiro CLI agent. If you wa
 selectable Kiro agent, create your own `.kiro/agents/qiju.json` after init and point it at
 the installed `.kiro/skills/` entries according to Kiro's agent docs.
 
-Kiro does not use automatic QiJu hooks. Log explicitly before ending work, and write
-temporary entry JSON inside the workspace, such as `.qiju/qiju-entry.json`, not `/tmp`.
+Kiro does not use automatic QiJu hooks. Log explicitly before ending work. Allocate the
+temporary entry file with `qiju temp-entry` (it returns a unique path under `.qiju/tmp/`
+inside the workspace, never `/tmp`), write the record JSON to that path, then ingest with
+`qiju log --body "$path" --cleanup`.
 
 ## Shared Store Rule
 

@@ -55,3 +55,74 @@ def test_maintain_tolerates_preexisting_malformed_ts(qiju_env):
     # The malformed entry is never archived; the good one is processed normally.
     assert "bad:1" in remaining
     assert not qiju_paths.archive_partition("not-a-").exists()
+
+
+def test_maintain_sweeps_stale_staging_file(qiju_env):
+    import os
+    from datetime import timedelta
+
+    qiju_paths = paths.resolve_paths(project="repo", cwd=qiju_env["project"])
+    paths.ensure_base_dirs(qiju_paths)
+    now = datetime.now().astimezone()
+    stale = qiju_paths.tmp_dir / "qiju-entry.claude.stale.json"
+    fresh = qiju_paths.tmp_dir / "qiju-entry.claude.fresh.json"
+    stale.write_text("{}")
+    fresh.write_text("{}")
+    old = (now - timedelta(hours=48)).timestamp()
+    os.utime(stale, (old, old))
+
+    result = maintain.maintain(project="repo", cwd=qiju_env["project"], now=now)
+    assert result["staging_sweep"]["removed"] == 1
+    assert result["staging_sweep"]["kept"] == 1
+    assert not stale.exists()
+    assert fresh.exists()
+
+
+def test_maintain_sweep_dry_run_removes_nothing(qiju_env):
+    import os
+    from datetime import timedelta
+
+    qiju_paths = paths.resolve_paths(project="repo", cwd=qiju_env["project"])
+    paths.ensure_base_dirs(qiju_paths)
+    now = datetime.now().astimezone()
+    stale = qiju_paths.tmp_dir / "qiju-entry.claude.stale.json"
+    stale.write_text("{}")
+    old = (now - timedelta(hours=48)).timestamp()
+    os.utime(stale, (old, old))
+
+    result = maintain.maintain(project="repo", cwd=qiju_env["project"], now=now, dry_run=True)
+    assert result["staging_sweep"]["removed"] == 1
+    assert stale.exists()  # dry-run reported but did not delete
+
+
+def test_maintain_sweep_never_touches_symlink_or_non_managed(qiju_env):
+    import os
+    from datetime import timedelta
+
+    qiju_paths = paths.resolve_paths(project="repo", cwd=qiju_env["project"])
+    paths.ensure_base_dirs(qiju_paths)
+    now = datetime.now().astimezone()
+    old = (now - timedelta(hours=48)).timestamp()
+
+    # (a) a genuine stale staging file -> swept
+    genuine = qiju_paths.tmp_dir / "qiju-entry.claude.genuine.json"
+    genuine.write_text("{}")
+    os.utime(genuine, (old, old))
+
+    # (b) an aged SYMLINK whose name matches the glob -> must be skipped (islink guard)
+    secret = qiju_paths.project_root / "secret.txt"
+    secret.write_text("do not delete")
+    link = qiju_paths.tmp_dir / "qiju-entry.claude.link.json"
+    link.symlink_to(secret)
+    os.utime(link, (old, old), follow_symlinks=False)
+
+    # (c) an aged file whose name does NOT match the staging glob -> must be skipped
+    non_managed = qiju_paths.tmp_dir / "keep-me.json"
+    non_managed.write_text("{}")
+    os.utime(non_managed, (old, old))
+
+    result = maintain.maintain(project="repo", cwd=qiju_env["project"], now=now)
+    assert result["staging_sweep"]["removed"] == 1
+    assert not genuine.exists()
+    assert link.exists() and secret.exists()  # symlink + its target untouched
+    assert non_managed.exists()               # non-managed name untouched

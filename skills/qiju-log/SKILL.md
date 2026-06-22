@@ -18,14 +18,20 @@ context, or invokes `/qiju-log`.
    - `next_steps`: actionable remaining items.
    - `body_md`: full human-readable markdown narrative. Do not shorten it to save space —
      the body is the handoff; storage is negligible.
-2. Write that JSON object to `.qiju/qiju-entry.json` INSIDE the workspace. Never write it
-   to `/tmp` (some hosts reject writes outside the workspace).
-3. Run:
+2. Allocate a unique workspace-local staging file (Qiju owns the name):
 
    ```bash
-   qiju log --source manual --agent claude --project <project> --body .qiju/qiju-entry.json
+   path="$(qiju temp-entry --agent claude)"
    ```
-4. Remove `.qiju/qiju-entry.json` after a successful log.
+
+   This returns a path under `.qiju/tmp/` (inside the workspace — never `/tmp`; some hosts
+   reject writes outside the workspace).
+3. Write the JSON object to exactly that `$path`. Then ingest and let Qiju delete it:
+
+   ```bash
+   qiju log --source manual --agent claude --project <project> --body "$path" --cleanup
+   ```
+4. Qiju removes the staging file on success — do not delete it yourself.
 5. Report the returned record id.
 
 Do NOT include PII, credentials, secrets, or other sensitive

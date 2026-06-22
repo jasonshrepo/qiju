@@ -6,7 +6,21 @@ All notable changes to QiJu are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-22
+
 ### Added
+- **Concurrency-safe staging files** — new `qiju temp-entry` command allocates a unique,
+  workspace-local staging file (`.qiju/tmp/qiju-entry.<agent>.<uuid>.json`) via atomic
+  exclusive create. This removes the race where two agents logging at the same time in the
+  same project could overwrite, delete, or read a torn copy of the previously shared
+  `.qiju/qiju-entry.json`.
+- **Guarded `qiju log --cleanup`** — after a successful durable write, `qiju log` deletes
+  the `--body` file only when it is a Qiju-managed staging file. The guard rejects symlinks,
+  `../` traversal, and paths outside `.qiju/tmp/`, so it never deletes an arbitrary
+  user-provided file; a refused cleanup warns but does not fail the log.
+- **Stale staging-file sweep** — `qiju maintain` now removes abandoned
+  `.qiju/tmp/qiju-entry.*.json` files older than 24h (left behind by crashed agents),
+  applying the same symlink/containment safety checks.
 - **`qiju-review` skill** — a project-owned retrospective skill for reviewing recent QiJu
   records, extracting lessons, and recommending prompt/skill improvements.
 - **Provider-neutral skill layout** — QiJu now ships only portable
@@ -14,6 +28,12 @@ All notable changes to QiJu are documented here. The format is based on
   `agents/openai.yaml`. Cursor now uses `.cursor/skills/<skill-name>/SKILL.md` instead of a
   `.cursor/rules/qiju.mdc` rule, and Kiro no longer generates `.kiro/agents/qiju.json`;
   cleanup still removes those legacy files if present.
+
+### Changed
+- **`qiju-log` skill workflow** — the generated and shipped `qiju-log` instructions now
+  allocate a staging file with `qiju temp-entry`, write the record to it, and ingest with
+  `qiju log --body "$path" --cleanup` (Qiju removes the file on success) instead of writing
+  to the fixed `.qiju/qiju-entry.json` and deleting it by hand.
 
 ### Fixed
 - **Legacy Codex skill cleanup** — `qiju uninstall --hosts codex` now removes stale

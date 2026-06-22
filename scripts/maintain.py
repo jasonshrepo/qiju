@@ -8,14 +8,16 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from . import archive, paths as paths_mod, util
+    from . import archive, paths as paths_mod, staging, util
 except ImportError:  # pragma: no cover
     import archive  # type: ignore
     import paths as paths_mod  # type: ignore
+    import staging  # type: ignore
     import util  # type: ignore
 
 
 SHORT_WINDOW_DAYS = 14
+STAGING_TTL_HOURS = 24
 ARCHIVE_AFTER_DAYS = 92
 SMALL_PARTITION_FLOOR_BYTES = 2 * 1024 * 1024
 FORCE_LONG_FILE_BYTES = 50 * 1024 * 1024
@@ -135,6 +137,9 @@ def maintain(
 
     with util.exclusive_lock(current_paths.lock_file):
         rotation = rotate_short(current_paths, now=now, dry_run=dry_run)
+        sweep = staging.sweep_stale(
+            current_paths, now=now, ttl_hours=STAGING_TTL_HOURS, dry_run=dry_run
+        )
         projects = [current_paths.project] if project else [path.stem for path in paths_mod.all_long_files(current_paths.home)]
         if current_paths.project not in projects:
             projects.append(current_paths.project)
@@ -146,5 +151,5 @@ def maintain(
     for item in archives:
         for warning in item.get("warnings", []):
             print(f"warning: {warning}", file=sys.stderr)
-    return {"dry_run": dry_run, "rotation": rotation, "archives": archives}
+    return {"dry_run": dry_run, "rotation": rotation, "staging_sweep": sweep, "archives": archives}
 

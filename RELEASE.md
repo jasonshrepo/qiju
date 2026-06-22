@@ -126,8 +126,9 @@ Per-agent checks:
   that is expected — verify the global paths are present.
 - **Codex skill path** is `.agents/skills/` (repo) and `~/.agents/skills/` (user), per
   https://developers.openai.com/codex/skills — **not** `~/.codex/skills/`.
-- **Kiro** rejects writes to `/tmp`; entry JSON must be written inside the workspace
-  (`.qiju/qiju-entry.json`).
+- **Kiro** rejects writes to `/tmp`; entry JSON must stay workspace-local. Use
+  `qiju temp-entry` to allocate a unique staging file under `.qiju/tmp/`, then
+  `qiju log --body "$path" --cleanup`.
 - **Records are CLI-written.** A skill/steering/rule file never stores memories — it only
   tells the agent how to call `qiju`. Records always go to `<project>/.qiju/` +
   `~/.qiju/long/`.

@@ -109,6 +109,10 @@ class QijuPaths:
         return self.project_qiju_dir / "short.jsonl"
 
     @property
+    def tmp_dir(self) -> Path:
+        return self.project_qiju_dir / "tmp"
+
+    @property
     def long_dir(self) -> Path:
         return self.home / "long"
 
@@ -146,6 +150,7 @@ def resolve_paths(project: str | None = None, cwd: str | Path | None = None) -> 
 
 def ensure_base_dirs(paths: QijuPaths) -> None:
     paths.project_qiju_dir.mkdir(parents=True, exist_ok=True)
+    paths.tmp_dir.mkdir(parents=True, exist_ok=True)
     paths.long_dir.mkdir(parents=True, exist_ok=True)
     paths.archive_dir.mkdir(parents=True, exist_ok=True)
 
