@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="assets/logo.svg" alt="Qiju logo" width="440">
-</div>
-
 # Qiju · 起居
 
 <p align="center">
@@ -14,7 +10,6 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/qiju/"><img src="https://img.shields.io/pypi/v/qiju.svg" alt="PyPI version"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-216C83.svg" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-475A60.svg" alt="Platform: macOS | Linux">
   <a href="LICENSE"><img src="https://img.shields.io/pypi/l/qiju.svg" alt="License: Apache-2.0"></a>
