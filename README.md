@@ -212,13 +212,14 @@ QiJu is in **developer preview** and is available on PyPI.
 
 What works today, and is covered by the test suite (`uv run pytest`):
 
-- Capturing session records (`qiju log`).
+- Capturing session records (`qiju temp-entry` to allocate a staging file, `qiju log` to ingest it).
 - Finding past records (`qiju search`, `qiju show`) and listing known projects (`qiju projects`).
 - Tidy-up and long-term archiving of old records (`qiju maintain`).
 - One-time normalization of project names in an existing store (`qiju migrate`).
 - Removing secrets from records, including after the fact (`qiju redact`).
 - Wiring QiJu into your agent of choice (`qiju init --host …`) and removing it cleanly
   (`qiju uninstall`) without ever deleting your records.
+- Refreshing all skill files across every registered project after an upgrade (`qiju update`).
 
 ## Known limits
 
@@ -333,8 +334,9 @@ The agent ultimately runs the `qiju` CLI, and you can too — for automation or 
 store directly:
 
 ```bash
-# Save a record (the agent builds the JSON; you can also write it yourself or pipe via stdin)
-qiju log --source manual --agent claude --project my-project --body record.json
+# Save a record — allocate a staging file, write your JSON to it, then ingest
+qiju temp-entry --agent claude                                # returns a path under .qiju/tmp/
+qiju log --source manual --agent claude --project my-project --body <path> --cleanup
 
 # Find records — two-phase: search lists candidate <uuid>:N ids, show hydrates one
 qiju search --scope current_project --query "auth cookie"
@@ -347,6 +349,13 @@ qiju maintain --dry-run
 qiju redact --value "secret-value" --reason "leaked in session"
 qiju migrate --dry-run                            # preview project-name normalization (one-time upgrade step)
 
+# Refresh skill files after upgrading QiJu
+uv tool upgrade qiju              # update the CLI
+qiju update                       # refresh SKILL.md in every registered project
+qiju update --dry-run             # preview what would change
+qiju update --host claude         # only refresh claude skills
+qiju update --scan-projects       # first-time migration: scan + backfill the registry
+
 # Remove the integration — records are always preserved
 qiju uninstall --dry-run                          # preview everything that would be removed
 qiju uninstall --hosts kiro                        # remove just one host (claude|kiro|codex|cursor)
@@ -354,6 +363,12 @@ qiju uninstall --hosts kiro,cursor --project-only  # one or more hosts, project-
 qiju uninstall --no-scan-projects                  # clean only the current project
 qiju uninstall --user-only                         # only user-level install + global host wiring
 ```
+
+`qiju update` refreshes the `SKILL.md` files in every project registered at `qiju init` time
+(stored as one file per project under `~/.qiju/registry.d/`). For an existing install without a
+registry yet, run `qiju update --scan-projects` once to scan and backfill — after that, plain
+`qiju update` is fast and complete. An older single-file `~/.qiju/project-register.json` is
+migrated into `registry.d/` automatically on first use (the old file is renamed `.migrated`).
 
 By default `uninstall` cleans ALL discovered QiJu-enabled projects under common project
 roots (use `--no-scan-projects` to limit it to the current project). It scopes by **host**

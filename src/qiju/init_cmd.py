@@ -67,28 +67,24 @@ context, or invokes `/qiju-log`.
 
 ## Steps
 
-1. Summarize the current session, decision, or requested fact into a single JSON object:
+1. **Bash** — run `qiju temp-entry --agent {{agent}}`. Note the returned path as a literal
+   string. Do not store it in a shell variable — variables do not persist across tool calls.
+   The path is under `.qiju/tmp/` (inside the workspace — never `/tmp`).
+2. **Read** — read the returned path. The file is empty; this satisfies the Write tool's
+   prior-read requirement.
+3. **Write** — write the JSON record to that path. Compose it as the `content` parameter:
    - `title`: one-line summary.
    - `tags`: 3-5 categories.
    - `search_terms`: aliases, service names, error codes, symbols, and useful variants.
    - `next_steps`: actionable remaining items.
    - `body_md`: full human-readable markdown narrative. Do not shorten it to save space —
      the body is the handoff; storage is negligible.
-2. Allocate a unique workspace-local staging file (Qiju owns the name):
-
+4. **Bash** — ingest and let Qiju delete the staging file:
    ```bash
-   path="$(qiju temp-entry --agent {{agent}})"
+   qiju log --source manual --agent {{agent}} --project <project> --body <literal-path> --cleanup
    ```
-
-   This returns a path under `.qiju/tmp/` (inside the workspace — never `/tmp`; some hosts
-   reject writes outside the workspace).
-3. Write the JSON object to exactly that `$path`. Then ingest and let Qiju delete it:
-
-   ```bash
-   qiju log --source manual --agent {{agent}} --project <project> --body "$path" --cleanup
-   ```
-4. Qiju removes the staging file on success — do not delete it yourself.
-5. Report the returned record id.
+   Report the returned record id. Qiju removes the staging file on success — do not delete
+   it yourself.
 
 {SENSITIVE_DATA_WARNING}
 
@@ -529,6 +525,12 @@ def init_project_qiju(qiju_paths: paths_mod.QijuPaths, agent: str) -> list[str]:
     }
     _write_file(config_path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
     files.append(str(config_path))
+
+    try:
+        from . import register as register_mod
+    except ImportError:  # pragma: no cover
+        import register as register_mod  # type: ignore
+    register_mod.register_project(qiju_paths.project_root, qiju_paths.project)
 
     exclude = add_git_info_exclude(qiju_paths.project_root)
     if exclude:

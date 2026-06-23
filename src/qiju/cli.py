@@ -8,7 +8,7 @@ import sys
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 try:
-    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage
+    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage, update_cmd as update_mod
 except ImportError:  # pragma: no cover
     import capture  # type: ignore
     import cleanup as cleanup_mod  # type: ignore
@@ -21,6 +21,7 @@ except ImportError:  # pragma: no cover
     import search  # type: ignore
     import staging  # type: ignore
     import storage  # type: ignore
+    import update_cmd as update_mod  # type: ignore
 
 
 def get_version() -> str:
@@ -277,6 +278,68 @@ def _print_uninstall_result(result: cleanup_mod.CleanupResult) -> None:
     print(f"Summary: {removed} removed, {len(result.preserved)} preserved")
 
 
+def _print_update_result(result: update_mod.UpdateResult) -> None:
+    label = "dry-run" if result.dry_run else "update"
+    print(f"qiju {label}")
+    print()
+    if result.notes:
+        for note in result.notes:
+            print(f"  note: {note}")
+        print()
+    if not result.projects and not result.global_hosts:
+        if result.warnings:
+            for warning in result.warnings:
+                print(warning)
+        else:
+            print("  (nothing to update)")
+        return
+    for proj in result.projects:
+        hosts_str = ", ".join(proj["hosts"]) if proj["hosts"] else "(no matching hosts)"
+        print(f"  {proj['path']:<50}  {hosts_str}  →  {proj['status']}")
+    for gh in result.global_hosts:
+        print(f"  global {gh['host']:<44}  →  {gh['status']}")
+    if result.warnings:
+        print()
+        print("Warnings:")
+        for warning in result.warnings:
+            print(f"  {warning}")
+    print()
+    updated_projects = sum(1 for p in result.projects if p["status"] in ("updated", "would update"))
+    updated_global = len(result.global_hosts)
+    verb = "would update" if result.dry_run else "updated"
+    print(f"Summary: {updated_projects} project(s), {updated_global} global host(s) {verb}.")
+    extra_counts = [
+        (label, sum(1 for p in result.projects if p["status"] == label))
+        for label in ("unchanged", "skipped", "missing", "failed")
+    ]
+    extra = ", ".join(f"{count} {label}" for label, count in extra_counts if count)
+    if extra:
+        print(f"  ({extra})")
+    if result.dry_run:
+        print("(dry run — nothing written)")
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    try:
+        hosts = cleanup_mod.parse_hosts(args.host)
+        result = update_mod.update(
+            project_root=".",
+            hosts=hosts,
+            scan_projects=bool(args.scan_projects),
+            scan_roots=args.scan_root,
+            scan_depth=args.scan_depth,
+            dry_run=args.dry_run,
+        )
+        if getattr(args, "json", False):
+            _print_json(result.as_dict())
+        else:
+            _print_update_result(result)
+        return 0
+    except Exception as exc:
+        print(f"qiju update: {exc}", file=sys.stderr)
+        return 1
+
+
 def cmd_uninstall(args: argparse.Namespace) -> int:
     try:
         purge = getattr(args, "purge_data", False)
@@ -411,6 +474,19 @@ def build_parser() -> argparse.ArgumentParser:
     maintain_parser.add_argument("--project")
     maintain_parser.add_argument("--dry-run", action="store_true")
     maintain_parser.set_defaults(func=cmd_maintain)
+
+    update_parser = subparsers.add_parser("update", help="Refresh Qiju skill files in all registered projects after an upgrade")
+    update_parser.add_argument("--host", default="all")
+    update_parser.add_argument("--dry-run", action="store_true")
+    update_parser.add_argument(
+        "--scan-projects", action=argparse.BooleanOptionalAction, default=False,
+        help="Also scan project roots and backfill the registry (default: off; registry-first). "
+             "Use this once to migrate an existing install.",
+    )
+    update_parser.add_argument("--scan-root", action="append")
+    update_parser.add_argument("--scan-depth", type=int, default=cleanup_mod.DEFAULT_SCAN_DEPTH)
+    update_parser.add_argument("--json", action="store_true")
+    update_parser.set_defaults(func=cmd_update)
 
     uninstall_parser = subparsers.add_parser("uninstall", help="Remove Qiju installation files without deleting records")
     uninstall_scope = uninstall_parser.add_mutually_exclusive_group()

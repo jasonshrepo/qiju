@@ -505,6 +505,14 @@ def cleanup(
     project_roots: list[Path] = []
     if project_root is not None:
         project_roots.append(Path(project_root).expanduser().resolve())
+    try:
+        from . import register as register_mod
+    except ImportError:  # pragma: no cover
+        import register as register_mod  # type: ignore
+    registered, pruned = register_mod.registered_roots()
+    project_roots.extend(registered)
+    for note in pruned:
+        result.warnings.append(f"pruned stale registry entry: {note}")
     if scan_projects:
         project_roots.extend(discover_project_roots(scan_roots, max_depth=scan_depth))
 
@@ -521,6 +529,8 @@ def cleanup(
             hosts=hosts,
             dry_run=dry_run,
         )
+        if not dry_run:
+            register_mod.unregister_project(resolved_project_root)
 
     if not user and project_root is None and not scan_projects:
         result.warnings.append("nothing selected; use uninstall without scope flags or pass --user-only/--project-only")
