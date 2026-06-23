@@ -1,5 +1,9 @@
 # Qiju · 起居
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/jasonshrepo/qiju/main/assets/logo.svg" alt="Qiju logo" width="440">
+</div>
+
 <p align="center">
   <strong>你的编程 agent 忘了，Qiju 替它记着。</strong>
 </p>

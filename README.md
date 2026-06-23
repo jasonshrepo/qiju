@@ -1,5 +1,9 @@
 # Qiju · 起居
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/jasonshrepo/qiju/main/assets/logo.svg" alt="Qiju logo" width="440">
+</div>
+
 <p align="center">
   <strong>Your coding agent forgot. Qiju kept the record.</strong>
 </p>
