@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from threading import Barrier
@@ -150,28 +151,28 @@ def test_concurrent_same_session_logs_get_distinct_generated_ids(qiju_env, monke
 
 def test_read_entry_missing_body_file(tmp_path):
     missing = tmp_path / "nope.json"
-    with pytest.raises(ValueError, match=f"body file not found: {missing}"):
+    with pytest.raises(ValueError, match=f"body file not found: {re.escape(str(missing))}"):
         capture.read_entry(str(missing))
 
 
 def test_read_entry_empty_body_file(tmp_path):
     empty = tmp_path / "empty.json"
     empty.write_text("   \n", encoding="utf-8")
-    with pytest.raises(ValueError, match=f"body file is empty: {empty}"):
+    with pytest.raises(ValueError, match=f"body file is empty: {re.escape(str(empty))}"):
         capture.read_entry(str(empty))
 
 
 def test_read_entry_invalid_json_body_file(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("{not json", encoding="utf-8")
-    with pytest.raises(ValueError, match=f"body file {bad} is not valid JSON"):
+    with pytest.raises(ValueError, match=f"body file {re.escape(str(bad))} is not valid JSON"):
         capture.read_entry(str(bad))
 
 
 def test_read_entry_non_object_body_file(tmp_path):
     arr = tmp_path / "arr.json"
     arr.write_text("[1, 2, 3]", encoding="utf-8")
-    with pytest.raises(ValueError, match=f"body file {arr} must contain a JSON object"):
+    with pytest.raises(ValueError, match=f"body file {re.escape(str(arr))} must contain a JSON object"):
         capture.read_entry(str(arr))
 
 

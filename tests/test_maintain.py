@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
+
+import pytest
 
 from qiju import archive, capture, maintain, paths, util
 from tests.conftest import sample_entry
@@ -95,8 +98,11 @@ def test_maintain_sweep_dry_run_removes_nothing(qiju_env):
     assert stale.exists()  # dry-run reported but did not delete
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="symlinks and os.utime(follow_symlinks=False) are unavailable on Windows",
+)
 def test_maintain_sweep_never_touches_symlink_or_non_managed(qiju_env):
-    import os
     from datetime import timedelta
 
     qiju_paths = paths.resolve_paths(project="repo", cwd=qiju_env["project"])

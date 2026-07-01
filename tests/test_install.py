@@ -6,9 +6,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SH = ROOT / "install.sh"
+
+# install.sh is a POSIX-only (bash) machine installer and is not shipped into the
+# public release tree, so these tests only apply where it exists and can run.
+pytestmark = pytest.mark.skipif(
+    os.name == "nt" or not INSTALL_SH.exists(),
+    reason="install.sh is a POSIX-only installer, absent from the release tree",
+)
 
 
 def write_fake_uv(fake_bin: Path) -> None:

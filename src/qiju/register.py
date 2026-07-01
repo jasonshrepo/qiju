@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from . import paths as paths_mod
+from . import util
 
 
 REGISTER_SCHEMA_VERSION = 1
@@ -50,7 +52,12 @@ def _write_entry(resolved_path: str, slug: str) -> None:
     }
     tmp = target.with_name(f"{target.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, target)
+    try:
+        util.replace_atomic(tmp, target)
+    finally:
+        # If the replace ultimately failed, don't leave a staging file behind.
+        with contextlib.suppress(FileNotFoundError):
+            tmp.unlink()
 
 
 def _migrate_legacy_if_needed() -> None:

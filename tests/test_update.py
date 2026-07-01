@@ -123,6 +123,10 @@ def test_update_project_install_missing_when_config_absent(qiju_env, tmp_path):
     assert result.projects[0]["hosts"] == []
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="POSIX chmod-based write-failure injection has no effect on Windows",
+)
 def test_update_project_install_failed_on_write_error(qiju_env, tmp_path):
     project = _make_project(tmp_path / "proj", "proj", ["claude"])
     # Pre-create the skill directory as a read-only target so writes raise.
@@ -140,6 +144,10 @@ def test_update_project_install_failed_on_write_error(qiju_env, tmp_path):
     assert result.warnings  # failure surfaced as a warning
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="POSIX chmod-based write-failure injection has no effect on Windows",
+)
 def test_update_continues_after_one_project_fails(qiju_env, tmp_path, monkeypatch):
     # Two registered projects; one has a read-only skill dir so it fails.
     good = _make_project(tmp_path / "good", "good", ["claude"])

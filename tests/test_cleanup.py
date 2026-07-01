@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime
+
+import pytest
 
 from qiju import cleanup, init_cmd, register
 
@@ -113,6 +116,7 @@ def test_user_cleanup_refuses_install_root_that_overlaps_record_store(qiju_env, 
     assert any("overlaps Qiju home" in item["reason"] for item in result.preserved)
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="launchd LaunchAgent is macOS-only")
 def test_user_cleanup_removes_qiju_launch_agent(qiju_env, tmp_path, monkeypatch):
     home_dir = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home_dir))
