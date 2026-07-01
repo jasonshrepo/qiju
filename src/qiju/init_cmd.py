@@ -3,15 +3,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
+
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import paths as paths_mod, util
-except ImportError:  # pragma: no cover
-    import paths as paths_mod  # type: ignore
-    import util  # type: ignore
+from . import paths as paths_mod, util
 
 
 INIT_SCHEMA_VERSION = 1

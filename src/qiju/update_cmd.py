@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import paths as paths_mod, register as register_mod
-    from .init_cmd import _write_file, _qiju_log_skill, _qiju_search_skill, _qiju_review_skill, init_global_agent
-    from .cleanup import discover_project_roots, DEFAULT_SCAN_DEPTH, HOSTS
-except ImportError:  # pragma: no cover
-    import paths as paths_mod  # type: ignore
-    import register as register_mod  # type: ignore
-    from init_cmd import _write_file, _qiju_log_skill, _qiju_search_skill, _qiju_review_skill, init_global_agent  # type: ignore
-    from cleanup import discover_project_roots, DEFAULT_SCAN_DEPTH, HOSTS  # type: ignore
+from . import paths as paths_mod, register as register_mod
+from .init_cmd import _write_file, _qiju_log_skill, _qiju_search_skill, _qiju_review_skill, init_global_agent
+from .cleanup import discover_project_roots, DEFAULT_SCAN_DEPTH, HOSTS
 
 
 _RECOVERY_MSG = (

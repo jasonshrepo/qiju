@@ -5,6 +5,8 @@ import json
 import math
 import re
 import secrets
+
+
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
@@ -12,10 +14,7 @@ from importlib.resources import files as _res_files
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import allowlist as allowlist_mod
-except ImportError:  # pragma: no cover
-    import allowlist as allowlist_mod  # type: ignore
+from . import allowlist as allowlist_mod
 
 
 RULES_PATH = _res_files("qiju").joinpath("config/redaction_rules.json")

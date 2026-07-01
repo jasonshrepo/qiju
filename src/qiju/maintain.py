@@ -2,18 +2,14 @@ from __future__ import annotations
 
 import json
 import sys
+
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import archive, paths as paths_mod, staging, util
-except ImportError:  # pragma: no cover
-    import archive  # type: ignore
-    import paths as paths_mod  # type: ignore
-    import staging  # type: ignore
-    import util  # type: ignore
+from . import archive, paths as paths_mod, staging, util
 
 
 SHORT_WINDOW_DAYS = 14

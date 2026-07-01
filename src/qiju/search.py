@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+
+
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import paths as paths_mod, storage, util
-except ImportError:  # pragma: no cover
-    import paths as paths_mod  # type: ignore
-    import storage  # type: ignore
-    import util  # type: ignore
+from . import paths as paths_mod, storage, util
 
 
 def _resolve_scope(scope: str, project: str | None, cwd: str | Path | None) -> list[str]:

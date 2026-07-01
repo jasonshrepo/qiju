@@ -3,12 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import archive, paths as paths_mod, util
-except ImportError:  # pragma: no cover
-    import archive  # type: ignore
-    import paths as paths_mod  # type: ignore
-    import util  # type: ignore
+from . import archive, paths as paths_mod, util
 
 
 def archive_files_for_project(qiju_paths: paths_mod.QijuPaths) -> list[Path]:

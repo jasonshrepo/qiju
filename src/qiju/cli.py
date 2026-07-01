@@ -5,23 +5,11 @@ import argparse
 import json
 import os
 import sys
+
+
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
-try:
-    from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage, update_cmd as update_mod
-except ImportError:  # pragma: no cover
-    import capture  # type: ignore
-    import cleanup as cleanup_mod  # type: ignore
-    import init_cmd  # type: ignore
-    import maintain as maintain_mod  # type: ignore
-    import migrate as migrate_mod  # type: ignore
-    import paths as paths_mod  # type: ignore
-    import retro_redact  # type: ignore
-    import schema  # type: ignore
-    import search  # type: ignore
-    import staging  # type: ignore
-    import storage  # type: ignore
-    import update_cmd as update_mod  # type: ignore
+from . import capture, cleanup as cleanup_mod, init_cmd, maintain as maintain_mod, migrate as migrate_mod, paths as paths_mod, retro_redact, schema, search, staging, storage, update_cmd as update_mod
 
 
 def get_version() -> str:
@@ -518,7 +506,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8_io() -> None:
+    """Emit UTF-8 regardless of the console/locale encoding.
+
+    On Windows a redirected/piped stdout defaults to the locale codec (e.g. cp1252),
+    which raises UnicodeEncodeError on the non-ASCII text Qiju records routinely hold.
+    Reconfiguring to UTF-8 with errors="replace" makes output safe on every platform.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_io()
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)

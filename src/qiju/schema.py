@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-try:
-    from . import util
-except ImportError:  # pragma: no cover
-    import util  # type: ignore
+from . import util
 
 
 SCHEMA_VERSION = 2

@@ -4,14 +4,14 @@ import fnmatch
 import os
 import re
 import uuid
+
+
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import paths as paths_mod
-except ImportError:  # pragma: no cover
-    import paths as paths_mod  # type: ignore
+from . import paths as paths_mod
+
 
 STAGING_PREFIX = "qiju-entry."
 STAGING_SUFFIX = ".json"

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Iterator
+
+# File locking is platform-specific: POSIX has fcntl.flock; Windows has msvcrt.locking.
+# Import only the one that exists so the module loads on both (fcntl is absent on Windows).
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 def utcish_now_iso() -> str:
@@ -43,6 +50,24 @@ def append_jsonl(path: Path, entry: dict[str, Any]) -> None:
         os.fsync(handle.fileno())
 
 
+def replace_atomic(src: Path, dst: Path, attempts: int = 10, base_delay: float = 0.05) -> None:
+    """``os.replace(src, dst)`` with Windows-only retry.
+
+    On POSIX, replace-over-open-file is atomic and a PermissionError is a genuine error, so
+    it propagates immediately. On Windows os.replace raises PermissionError when another
+    process (antivirus, indexer, a concurrent reader) briefly holds the destination open;
+    a short backoff retries past that transient hold.
+    """
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if os.name != "nt" or i == attempts - 1:
+                raise
+            time.sleep(base_delay * (i + 1))
+
+
 def write_jsonl_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
@@ -54,7 +79,7 @@ def write_jsonl_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
                 handle.write(line + "\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp_path, path)
+        replace_atomic(tmp_path, path)
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp_path.unlink()
@@ -69,21 +94,45 @@ def write_text_atomic(path: Path, text: str) -> None:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp_path, path)
+        replace_atomic(tmp_path, path)
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp_path.unlink()
+
+
+def _acquire_lock(handle) -> None:
+    """Block until an exclusive lock on ``handle`` is held (whole-file on POSIX,
+    a 1-byte region at offset 0 on Windows)."""
+    if os.name == "nt":
+        handle.seek(0)
+        # LK_LOCK retries for ~10s then raises; loop so the call blocks until acquired.
+        while True:
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                return
+            except OSError:
+                continue
+    else:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _release_lock(handle) -> None:
+    if os.name == "nt":
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 @contextlib.contextmanager
 def exclusive_lock(lock_path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        _acquire_lock(handle)
         try:
             yield
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            _release_lock(handle)
 
 
 def stable_unique(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:

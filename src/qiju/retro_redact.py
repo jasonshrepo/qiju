@@ -3,14 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import archive, paths as paths_mod, redact, storage, util
-except ImportError:  # pragma: no cover
-    import archive  # type: ignore
-    import paths as paths_mod  # type: ignore
-    import redact  # type: ignore
-    import storage  # type: ignore
-    import util  # type: ignore
+from . import archive, paths as paths_mod, redact, storage, util
 
 
 def _rewrite_jsonl(path: Path, value: str, placeholder: str) -> int:

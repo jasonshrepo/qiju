@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import tempfile
+
+
 from pathlib import Path
 from typing import Any
 
@@ -10,10 +12,7 @@ try:
 except ImportError:  # pragma: no cover
     duckdb = None  # type: ignore
 
-try:
-    from . import util
-except ImportError:  # pragma: no cover
-    import util  # type: ignore
+from . import util
 
 
 def _sql_quote(value: str) -> str:
@@ -66,7 +65,7 @@ def write_parquet_atomic(path: Path, entries: list[dict[str, Any]]) -> None:
         validated_ids = {entry.get("id") for entry in validated}
         if validated_ids != expected_ids:
             raise RuntimeError(f"Parquet validation failed for {parquet_tmp_path}: ID set mismatch")
-        os.replace(parquet_tmp_path, path)
+        util.replace_atomic(parquet_tmp_path, path)
     finally:
         for tmp in (json_tmp_path, parquet_tmp_path):
             try:

@@ -4,12 +4,12 @@ import hashlib
 import json
 import os
 import uuid
+
+
 from pathlib import Path
 
-try:
-    from . import paths as paths_mod
-except ImportError:  # pragma: no cover
-    import paths as paths_mod  # type: ignore
+from . import paths as paths_mod
+
 
 REGISTER_SCHEMA_VERSION = 1
 LEGACY_REGISTER_FILENAME = "project-register.json"

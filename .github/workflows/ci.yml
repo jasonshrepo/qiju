@@ -1,0 +1,36 @@
+name: CI
+
+# Test-only CI: builds and publishes nothing, and holds no repository credentials.
+# Publishing stays with the separate script-first pipeline. All logic lives in ci/run_ci.py
+# so the workflow is a thin
+# wrapper. Actions are pinned to full commit SHAs (tag noted in the comment) so a moved tag
+# cannot change what runs.
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run cross-platform CI (import + version, pytest, smoke)
+        run: uv run --with pytest --with duckdb python ci/run_ci.py

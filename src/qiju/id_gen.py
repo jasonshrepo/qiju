@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import os
 import uuid
+
+
 from pathlib import Path
 
-try:
-    from . import storage, util
-except ImportError:  # pragma: no cover
-    import storage  # type: ignore
-    import util  # type: ignore
+from . import storage, util
 
 
 def session_uuid(explicit: str | None = None) -> str:

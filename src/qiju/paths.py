@@ -75,6 +75,9 @@ def _read_marker_slug(root: Path) -> str | None:
     return project if isinstance(project, str) and project else None
 
 
+_WINDOWS_RESERVED_NAMES = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
+
+
 def slugify_project(value: str) -> str:
     # Lowercase is part of the canonical project identity: a casing slip would fork a
     # project's history into a silently unretrievable shadow set.
@@ -82,7 +85,13 @@ def slugify_project(value: str) -> str:
     if not value:
         raise ValueError("project name cannot be empty")
     slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-").lower()
-    return slug or "project"
+    # Windows silently strips trailing dots/spaces from filenames, which would fork a
+    # project's identity from its on-disk name; drop them before they reach the filesystem.
+    slug = slug.rstrip(". ").strip("-") or "project"
+    # Windows reserves these device names; a `nul.jsonl` etc. is an illegal filename.
+    if slug in _WINDOWS_RESERVED_NAMES:
+        slug = f"{slug}-x"
+    return slug
 
 
 def project_slug(project: str | None = None, cwd: str | Path | None = None) -> str:

@@ -3,19 +3,13 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+
 from pathlib import Path
 from typing import Any
 
-try:
-    from . import id_gen, paths as paths_mod, redact, schema, util
-    from .storage import id_locations
-except ImportError:  # pragma: no cover
-    import id_gen  # type: ignore
-    import paths as paths_mod  # type: ignore
-    import redact  # type: ignore
-    import schema  # type: ignore
-    import util  # type: ignore
-    from storage import id_locations  # type: ignore
+from . import id_gen, paths as paths_mod, redact, schema, util
+from .storage import id_locations
 
 
 def read_entry(body_path: str | None = None, stdin_text: str | None = None) -> dict[str, Any]:
