@@ -24,6 +24,20 @@ NON_ASCII = "测试 🚀 café"
 PROJECT = "smoke"
 
 
+def _force_utf8_output() -> None:
+    """Make this harness's own stdout/stderr UTF-8 so its non-ASCII summary and any
+    captured output can be printed on Windows (default cp1252 console) without a
+    UnicodeEncodeError. Mirrors the CLI's own console fix; the qiju subprocess under
+    test is exercised separately via UTF-8 pipe capture."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):  # pragma: no cover - stream not reconfigurable
+                pass
+
+
 def _qiju_cmd() -> list[str]:
     """Prefer the installed console script; fall back to running the package in-tree."""
     exe = shutil.which("qiju")
@@ -52,6 +66,7 @@ def fail(stage: str, proc: subprocess.CompletedProcess) -> None:
 
 
 def main() -> int:
+    _force_utf8_output()
     workdir = Path(tempfile.mkdtemp(prefix="qiju-smoke-"))
     try:
         home = workdir / "home"
